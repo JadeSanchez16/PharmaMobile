@@ -58,7 +58,7 @@ fun ProductoScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
-    var formularioExpandido by remember { mutableStateOf(true) }
+    var formularioExpandido by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.mensajeExito) {
         uiState.mensajeExito?.let { snackbarHostState.showSnackbar(it) }
@@ -81,8 +81,8 @@ fun ProductoScreen(
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         SectionHeader(
-            title = "Gestiona tu inventario",
-            description = "Controla precios, disponibilidad y reposición desde una sola vista.",
+            title = "Gestión de inventario",
+            description = "Consulta el catálogo o registra un nuevo producto.",
             icon = Icons.Default.Medication
         )
 
@@ -207,11 +207,11 @@ private fun ProductoFormulario(
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = if (uiState.productoEnEdicionId == null) "Nuevo producto" else "Editar producto",
+                        text = if (uiState.productoEnEdicionId == null) "Agregar producto" else "Editar producto",
                         style = MaterialTheme.typography.titleLarge
                     )
                     Text(
-                        text = "Completa los datos comerciales y de inventario.",
+                        text = if (expandido) "Completa los datos del inventario." else "Toca para desplegar el formulario.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

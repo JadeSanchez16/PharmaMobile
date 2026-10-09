@@ -265,9 +265,9 @@ private fun PharmaMobilScaffold(
                     Column {
                         Text(text = tituloPantalla(pantallaActual), style = MaterialTheme.typography.titleLarge)
                         Text(
-                            text = "PharmaMobil",
+                            text = "PHARMA • OPERACIONES",
                             style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary
+                            color = MaterialTheme.colorScheme.secondaryContainer
                         )
                     }
                 },
@@ -278,7 +278,8 @@ private fun PharmaMobilScaffold(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Menu,
-                                contentDescription = "Abrir menú"
+                                contentDescription = "Abrir menú",
+                                tint = MaterialTheme.colorScheme.onPrimary
                             )
                         }
                     }
@@ -287,13 +288,14 @@ private fun PharmaMobilScaffold(
                     IconButton(onClick = { onDarkThemeChange(!darkTheme) }) {
                         Icon(
                             imageVector = if (darkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
-                            contentDescription = if (darkTheme) "Activar modo claro" else "Activar modo oscuro"
+                            contentDescription = if (darkTheme) "Activar modo claro" else "Activar modo oscuro",
+                            tint = MaterialTheme.colorScheme.onPrimary
                         )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimary
                 )
             )
         }
@@ -445,8 +447,8 @@ private fun tituloPantalla(
     screen: Screen
 ): String {
     return when (screen) {
-        Screen.Inicio -> "Inicio"
-        Screen.Productos -> "Productos"
+        Screen.Inicio -> "Resumen de hoy"
+        Screen.Productos -> "Inventario"
         Screen.Clientes -> "Clientes"
         Screen.Pedidos -> "Pedidos"
     }

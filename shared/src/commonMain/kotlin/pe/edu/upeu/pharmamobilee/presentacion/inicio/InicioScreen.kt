@@ -1,11 +1,9 @@
 package pe.edu.upeu.pharmamobilee.presentacion.inicio
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,17 +13,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.LocalPharmacy
-import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material.icons.filled.ShoppingCartCheckout
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.ElevatedCard
+import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -34,12 +32,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import org.jetbrains.compose.resources.painterResource
-import pharmamobilee.shared.generated.resources.Res
-import pharmamobilee.shared.generated.resources.pharmamobil_logo
+import pe.edu.upeu.pharmamobilee.theme.AzulClaro
+import pe.edu.upeu.pharmamobilee.theme.AzulInstitucional
+import pe.edu.upeu.pharmamobilee.theme.AzulNoche
 
 @Composable
 fun InicioScreen(
@@ -54,317 +54,229 @@ fun InicioScreen(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(24.dp)
+            .padding(horizontal = 18.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(22.dp)
     ) {
-        InicioHeader()
-        ResumenInventario(
-            totalProductos = totalProductos,
-            productosActivos = productosActivos,
-            productosBajoStock = productosBajoStock,
-            onClick = onProductosClick
-        )
-        ModulosResumen(
-            onProductosClick = onProductosClick,
-            onClientesClick = onClientesClick,
-            onPedidosClick = onPedidosClick
-        )
-        EstadoOperacion(onProductosClick = onProductosClick)
+        HeroPanel(totalProductos, onProductosClick)
+        Indicadores(productosActivos, productosBajoStock, onProductosClick)
+        AccesosOperativos(onProductosClick, onClientesClick, onPedidosClick)
+        SincronizacionCard()
     }
 }
 
 @Composable
-private fun ResumenInventario(
-    totalProductos: Int,
-    productosActivos: Int,
-    productosBajoStock: Int,
-    onClick: () -> Unit
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(text = "Resumen del inventario", style = MaterialTheme.typography.titleLarge)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            ResumenCard(
-                valor = totalProductos.toString(),
-                etiqueta = "Productos",
-                icono = Icons.Default.Inventory2,
-                onClick = onClick,
-                modifier = Modifier.weight(1f)
-            )
-            ResumenCard(
-                valor = productosActivos.toString(),
-                etiqueta = "Activos",
-                icono = Icons.Default.LocalPharmacy,
-                onClick = onClick,
-                modifier = Modifier.weight(1f)
-            )
-            ResumenCard(
-                valor = productosBajoStock.toString(),
-                etiqueta = "Bajo stock",
-                icono = Icons.Default.WarningAmber,
-                onClick = onClick,
-                modifier = Modifier.weight(1f),
-                esAlerta = productosBajoStock > 0
-            )
-        }
-    }
-}
-
-@Composable
-private fun ResumenCard(
-    valor: String,
-    etiqueta: String,
-    icono: ImageVector,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    esAlerta: Boolean = false
-) {
-    Surface(
-        modifier = modifier.clickable(onClick = onClick),
-        shape = MaterialTheme.shapes.large,
-        color = if (esAlerta) MaterialTheme.colorScheme.errorContainer
-        else MaterialTheme.colorScheme.surfaceContainer
-    ) {
-        Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Icon(
-                imageVector = icono,
-                contentDescription = null,
-                tint = if (esAlerta) MaterialTheme.colorScheme.onErrorContainer
-                else MaterialTheme.colorScheme.primary
-            )
-            Text(
-                text = valor,
-                style = MaterialTheme.typography.headlineSmall,
-                color = if (esAlerta) MaterialTheme.colorScheme.onErrorContainer
-                else MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = etiqueta,
-                style = MaterialTheme.typography.labelMedium,
-                color = if (esAlerta) MaterialTheme.colorScheme.onErrorContainer
-                else MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-@Composable
-private fun InicioHeader() {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.extraLarge,
-        color = MaterialTheme.colorScheme.primaryContainer
-    ) {
-        Row(
-            modifier = Modifier.padding(24.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(86.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surface),
-                contentAlignment = Alignment.Center
-            ) {
-                Image(
-                    painter = painterResource(Res.drawable.pharmamobil_logo),
-                    contentDescription = "Logo PharmaMobil",
-                    modifier = Modifier.size(58.dp)
+private fun HeroPanel(totalProductos: Int, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(
+                Brush.linearGradient(
+                    colors = listOf(AzulNoche, AzulInstitucional)
                 )
-            }
-
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Text(
-                    text = "PharmaMobil",
-                    style = MaterialTheme.typography.headlineLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-
-                Text(
-                    text = "Sistema de gestión farmacéutica",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-
-                AssistChip(
-                    onClick = {},
-                    label = {
-                        Text("Gestión segura y centralizada")
-                    },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.LocalPharmacy,
-                            contentDescription = null
-                        )
-                    }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ModulosResumen(
-    onProductosClick: () -> Unit,
-    onClientesClick: () -> Unit,
-    onPedidosClick: () -> Unit
-) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Text(text = "Accesos rápidos", style = MaterialTheme.typography.titleLarge)
-        Text(
-            text = "Todo lo que necesitas para la operación diaria.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-
-        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            val tarjetas = listOf<@Composable (Modifier) -> Unit>(
-                { cardModifier -> DashboardCard(
-                titulo = "Productos",
-                detalle = "Registro, stock y reposición",
-                icono = Icons.Default.Inventory2,
-                onClick = onProductosClick,
-                modifier = cardModifier
-            ) },
-                { cardModifier -> DashboardCard(
-                titulo = "Clientes",
-                detalle = "Datos de contacto",
-                icono = Icons.Default.Groups,
-                onClick = onClientesClick,
-                modifier = cardModifier
-            ) },
-                { cardModifier -> DashboardCard(
-                titulo = "Pedidos",
-                detalle = "Venta y detalle",
-                icono = Icons.Default.ShoppingCartCheckout,
-                onClick = onPedidosClick,
-                modifier = cardModifier
-            ) }
             )
-
-            if (maxWidth >= 600.dp) {
-                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                        tarjetas.take(2).forEach { tarjeta -> tarjeta(Modifier.weight(1f)) }
-                    }
-                    tarjetas.last()(Modifier.fillMaxWidth())
-                }
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    tarjetas.forEach { tarjeta -> tarjeta(Modifier.fillMaxWidth()) }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun DashboardCard(
-    titulo: String,
-    detalle: String,
-    icono: ImageVector,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    ElevatedCard(
-        modifier = modifier
-            .heightIn(min = 96.dp)
             .clickable(onClick = onClick)
+            .padding(24.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(18.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Surface(
-                modifier = Modifier.size(52.dp),
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.primaryContainer
+        Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
-                    contentAlignment = Alignment.Center
-                ) {
+                Surface(shape = RoundedCornerShape(8.dp), color = AzulClaro) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.CheckCircle, null, modifier = Modifier.size(15.dp), tint = AzulNoche)
+                        Text("RESUMEN EJECUTIVO", style = MaterialTheme.typography.labelMedium, color = AzulNoche)
+                    }
+                }
+                Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.14f)) {
                     Icon(
-                        imageVector = icono,
+                        Icons.Default.LocalPharmacy,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.size(30.dp)
+                        tint = Color.White,
+                        modifier = Modifier.padding(11.dp).size(26.dp)
                     )
                 }
             }
 
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(3.dp)
-            ) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
-                    text = titulo,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
+                    text = "Control de inventario\ny operaciones",
+                    style = MaterialTheme.typography.headlineLarge,
+                    color = Color.White
                 )
-
                 Text(
-                    text = detalle,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    text = "Consulta existencias y gestiona la operación desde un solo lugar.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = Color.White.copy(alpha = 0.82f)
                 )
             }
 
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                contentDescription = "Abrir $titulo",
-                tint = MaterialTheme.colorScheme.primary
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Bottom
+            ) {
+                Column {
+                    Text(
+                        text = totalProductos.toString().padStart(2, '0'),
+                        style = MaterialTheme.typography.headlineLarge,
+                        color = AzulClaro
+                    )
+                    Text("productos registrados", color = Color.White.copy(alpha = 0.78f))
+                }
+                Icon(Icons.AutoMirrored.Filled.ArrowForward, "Abrir inventario", tint = Color.White)
+            }
+        }
+    }
+}
+
+@Composable
+private fun Indicadores(activos: Int, bajoStock: Int, onClick: () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("Indicadores de inventario", style = MaterialTheme.typography.titleLarge)
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            IndicadorCard(
+                valor = activos,
+                etiqueta = "Disponibles",
+                detalle = "listos para vender",
+                icono = Icons.Default.Inventory2,
+                color = MaterialTheme.colorScheme.primaryContainer,
+                modifier = Modifier.weight(1f),
+                onClick = onClick
+            )
+            IndicadorCard(
+                valor = bajoStock,
+                etiqueta = "Por reponer",
+                detalle = if (bajoStock == 0) "todo en orden" else "requieren atención",
+                icono = Icons.Default.WarningAmber,
+                color = if (bajoStock > 0) MaterialTheme.colorScheme.errorContainer
+                else MaterialTheme.colorScheme.secondaryContainer,
+                modifier = Modifier.weight(1f),
+                onClick = onClick
             )
         }
     }
 }
 
 @Composable
-private fun EstadoOperacion(onProductosClick: () -> Unit) {
+private fun IndicadorCard(
+    valor: Int,
+    etiqueta: String,
+    detalle: String,
+    icono: ImageVector,
+    color: Color,
+    modifier: Modifier,
+    onClick: () -> Unit
+) {
     Surface(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onProductosClick),
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.secondaryContainer
+        modifier = modifier.heightIn(min = 142.dp).clickable(onClick = onClick),
+        shape = RoundedCornerShape(16.dp),
+        color = color
+    ) {
+        Column(
+            modifier = Modifier.padding(17.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp)
+        ) {
+            Icon(icono, null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(25.dp))
+            Text(valor.toString(), style = MaterialTheme.typography.headlineMedium)
+            Text(etiqueta, style = MaterialTheme.typography.titleMedium)
+            Text(detalle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun AccesosOperativos(
+    onProductosClick: () -> Unit,
+    onClientesClick: () -> Unit,
+    onPedidosClick: () -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text("Centro de operaciones", style = MaterialTheme.typography.titleLarge)
+            Text("Elige una tarea para comenzar.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        AccesoFila("Inventario", "Productos, precios y existencias", Icons.Default.Inventory2, onProductosClick, true)
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            AccesoCompacto("Clientes", "Contactos", Icons.Default.Groups, onClientesClick, Modifier.weight(1f))
+            AccesoCompacto("Pedidos", "Ventas", Icons.Default.ShoppingCartCheckout, onPedidosClick, Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun AccesoFila(
+    titulo: String,
+    detalle: String,
+    icono: ImageVector,
+    onClick: () -> Unit,
+    destacado: Boolean
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        shape = RoundedCornerShape(16.dp),
+        color = if (destacado) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface
     ) {
         Row(
             modifier = Modifier.padding(18.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.TrendingUp,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                modifier = Modifier.size(36.dp)
-            )
+            Surface(shape = RoundedCornerShape(12.dp), color = AzulNoche) {
+                Icon(icono, null, tint = Color.White, modifier = Modifier.padding(12.dp).size(25.dp))
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(titulo, style = MaterialTheme.typography.titleMedium)
+                Text(detalle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Icon(Icons.AutoMirrored.Filled.ArrowForward, "Abrir $titulo")
+        }
+    }
+}
 
-            Column(
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(
-                    text = "Inventario listo para operar",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
+@Composable
+private fun AccesoCompacto(
+    titulo: String,
+    detalle: String,
+    icono: ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier
+) {
+    Surface(
+        modifier = modifier.heightIn(min = 128.dp).clickable(onClick = onClick),
+        shape = RoundedCornerShape(16.dp),
+        tonalElevation = 1.dp
+    ) {
+        Column(modifier = Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            Icon(icono, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(29.dp))
+            Text(titulo, style = MaterialTheme.typography.titleMedium)
+            Text(detalle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
 
-                Text(
-                    text = "Revisa existencias y detecta productos con bajo stock en un solo lugar.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
+@Composable
+private fun SincronizacionCard() {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.primaryContainer
+    ) {
+        Row(
+            modifier = Modifier.padding(17.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Default.Sync, null, tint = MaterialTheme.colorScheme.primary)
+            Column {
+                Text("Conectado con PharmaSoft", fontWeight = FontWeight.Bold)
+                Text("Inventario actualizado desde el servidor", style = MaterialTheme.typography.bodyMedium)
             }
         }
     }
