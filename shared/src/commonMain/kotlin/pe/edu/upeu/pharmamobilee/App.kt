@@ -310,6 +310,7 @@ private fun PharmaMobilScaffold(
                     InicioScreen(
                         totalProductos = productosDisponibles.size,
                         productosActivos = productosDisponibles.count { it.activo },
+                        productosInactivos = productosDisponibles.count { !it.activo },
                         productosBajoStock = productosDisponibles.count { it.requiereReposicion },
                         onProductosClick = { onSeleccionarPantalla(Screen.Productos) },
                         onClientesClick = { onSeleccionarPantalla(Screen.Clientes) },
@@ -447,7 +448,7 @@ private fun tituloPantalla(
     screen: Screen
 ): String {
     return when (screen) {
-        Screen.Inicio -> "Resumen de hoy"
+        Screen.Inicio -> "Inicio"
         Screen.Productos -> "Inventario"
         Screen.Clientes -> "Clientes"
         Screen.Pedidos -> "Pedidos"

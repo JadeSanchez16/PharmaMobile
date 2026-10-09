@@ -108,7 +108,7 @@ fun InventarioTabs(
                     onClick = { tabSeleccionada = index },
                     label = {
                         Text(
-                            if (index == 2) "Bajo" else tab.titulo,
+                            tab.titulo,
                             maxLines = 1
                         )
                     },
@@ -127,7 +127,7 @@ fun InventarioTabs(
             value = busqueda,
             onValueChange = { busqueda = it },
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("Buscar en inventario") },
+            label = { Text("Buscar producto") },
             placeholder = { Text("Nombre del producto") },
             leadingIcon = {
                 Icon(imageVector = Icons.Default.Search, contentDescription = null)
@@ -245,7 +245,7 @@ fun ProductCard(
                 else MaterialTheme.colorScheme.surfaceVariant
             ) {
                 Text(
-                    text = if (producto.activo) "DISPONIBLE" else "INACTIVO",
+                    text = if (producto.activo) "ACTIVO" else "INACTIVO",
                     modifier = Modifier.padding(horizontal = 11.dp, vertical = 5.dp),
                     style = MaterialTheme.typography.labelMedium,
                     color = if (producto.activo) MaterialTheme.colorScheme.primary
@@ -274,7 +274,7 @@ fun ProductCard(
                         fontWeight = FontWeight.SemiBold
                     )
 
-                    Text("REF. ${producto.id.toString().padStart(4, '0')}", style = MaterialTheme.typography.bodySmall,
+                    Text("Código #${producto.id.toString().padStart(4, '0')}", style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (producto.origen == OrigenProducto.REMOTO) {
                         Text(

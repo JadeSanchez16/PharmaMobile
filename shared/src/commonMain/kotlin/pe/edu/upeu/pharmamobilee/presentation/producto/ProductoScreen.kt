@@ -13,9 +13,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddBox
+import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Inventory2
@@ -81,11 +83,18 @@ fun ProductoScreen(
             .padding(horizontal = 20.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        SectionHeader(
-            title = "Gestión de inventario",
-            description = "Consulta el catálogo o registra un nuevo producto.",
-            icon = Icons.Default.Medication
-        )
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.primaryContainer
+        ) {
+            SectionHeader(
+                title = "Gestión de inventario",
+                description = "Administra productos, existencias y disponibilidad.",
+                icon = Icons.Default.Medication,
+                modifier = Modifier.padding(18.dp)
+            )
+        }
 
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
             val formulario: @Composable () -> Unit = {
@@ -200,7 +209,8 @@ private fun ProductoFormulario(
             ) {
                 Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer) {
                     Icon(
-                        imageVector = Icons.Default.AddBox,
+                        imageVector = if (uiState.productoEnEdicionId == null) Icons.Default.AddBox
+                        else Icons.Default.EditNote,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSecondaryContainer,
                         modifier = Modifier.padding(10.dp).size(24.dp)
