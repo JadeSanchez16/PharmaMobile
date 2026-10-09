@@ -265,7 +265,7 @@ private fun PharmaMobilScaffold(
                     Column {
                         Text(text = tituloPantalla(pantallaActual), style = MaterialTheme.typography.titleLarge)
                         Text(
-                            text = "PHARMA • OPERACIONES",
+                            text = "PharmaMobile",
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.secondaryContainer
                         )

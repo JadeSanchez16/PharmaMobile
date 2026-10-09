@@ -15,8 +15,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
@@ -25,8 +25,10 @@ import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedButton
@@ -211,10 +213,14 @@ private fun ListaProductos(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         productos.forEach { producto ->
+            val productoVisible = producto.producto.copy(
+                nombre = producto.nombre,
+                categoria = producto.categoria
+            )
             ProductCard(
                 producto = producto,
-                onEditar = onEditarProducto?.let { { it(producto.producto) } },
-                onCompartir = onCompartirProducto?.let { { it(producto.producto) } },
+                onEditar = onEditarProducto?.let { { it(productoVisible) } },
+                onCompartir = onCompartirProducto?.let { { it(productoVisible) } },
                 onEliminar = { onSolicitarEliminar(producto) }
             )
         }
@@ -281,19 +287,30 @@ fun ProductCard(
 
                 Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                     if (onEditar != null) {
-                        IconButton(onClick = onEditar) {
+                        FilledTonalIconButton(
+                            onClick = onEditar,
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        ) {
                             Icon(
-                                imageVector = Icons.Default.Edit,
+                                imageVector = Icons.Default.EditNote,
                                 contentDescription = "Editar ${producto.nombre}"
                             )
                         }
                     }
                     if (onEliminar != null) {
-                        IconButton(onClick = onEliminar) {
+                        FilledTonalIconButton(
+                            onClick = onEliminar,
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer,
+                                contentColor = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        ) {
                             Icon(
-                                imageVector = Icons.Default.Delete,
-                                contentDescription = "Eliminar ${producto.nombre}",
-                                tint = MaterialTheme.colorScheme.error
+                                imageVector = Icons.Default.DeleteForever,
+                                contentDescription = "Eliminar ${producto.nombre}"
                             )
                         }
                     }

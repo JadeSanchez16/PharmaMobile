@@ -15,6 +15,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddBox
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Inventory2
@@ -199,7 +200,7 @@ private fun ProductoFormulario(
             ) {
                 Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer) {
                     Icon(
-                        imageVector = Icons.Default.Medication,
+                        imageVector = Icons.Default.AddBox,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSecondaryContainer,
                         modifier = Modifier.padding(10.dp).size(24.dp)
@@ -297,6 +298,15 @@ private fun ProductoFormulario(
                         strokeWidth = 2.dp
                     )
                 } else {
+                    Icon(
+                        imageVector = if (uiState.productoEnEdicionId == null) {
+                            Icons.Default.AddBox
+                        } else {
+                            Icons.Default.Inventory2
+                        },
+                        contentDescription = null,
+                        modifier = Modifier.padding(end = 8.dp).size(20.dp)
+                    )
                     Text(
                         if (uiState.productoEnEdicionId == null) {
                             "Registrar"
