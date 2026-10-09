@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Home
@@ -52,7 +53,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
-import pe.edu.upeu.pharmamobilee.domain.model.OrigenProducto
 import pe.edu.upeu.pharmamobilee.navigation.Screen
 import pe.edu.upeu.pharmamobilee.presentacion.cliente.ClienteScreen
 import pe.edu.upeu.pharmamobilee.presentacion.inicio.InicioScreen
@@ -87,8 +87,9 @@ fun App() {
         mutableStateOf<Screen>(Screen.Inicio)
     }
 
+    val systemInDarkTheme = isSystemInDarkTheme()
     var darkTheme by remember {
-        mutableStateOf(false)
+        mutableStateOf(systemInDarkTheme)
     }
 
     PharmaMobilTheme(
@@ -253,9 +254,7 @@ private fun PharmaMobilScaffold(
 ) {
     val productoViewModel = koinViewModel<ProductoViewModel>()
     val productoUiState by productoViewModel.uiState.collectAsState()
-    val productosLocales = productoUiState.productos.filter {
-        it.origen == OrigenProducto.LOCAL
-    }
+    val productosDisponibles = productoUiState.productos
 
     Scaffold(
         modifier = modifier,
@@ -307,9 +306,9 @@ private fun PharmaMobilScaffold(
             when (pantallaActual) {
                 Screen.Inicio -> {
                     InicioScreen(
-                        totalProductos = productosLocales.size,
-                        productosActivos = productosLocales.count { it.activo },
-                        productosBajoStock = productosLocales.count { it.requiereReposicion },
+                        totalProductos = productosDisponibles.size,
+                        productosActivos = productosDisponibles.count { it.activo },
+                        productosBajoStock = productosDisponibles.count { it.requiereReposicion },
                         onProductosClick = { onSeleccionarPantalla(Screen.Productos) },
                         onClientesClick = { onSeleccionarPantalla(Screen.Clientes) },
                         onPedidosClick = { onSeleccionarPantalla(Screen.Pedidos) }
