@@ -49,8 +49,8 @@ Koin es la implementación REST; el repositorio en memoria se conserva solamente
 como alternativa no inyectada.
 
 El cliente usa `ContentNegotiation` con `ignoreUnknownKeys = true`, timeout de
-solicitud de 15 segundos y `Logging` en nivel `ALL` para registrar la petición,
-cabeceras, estado y cuerpo durante las pruebas académicas. Los errores 404,
+solicitud de 15 segundos y `Logging` en nivel `HEADERS` para registrar la
+petición, las cabeceras y el estado sin exponer cuerpos durante la depuración. Los errores 404,
 timeout, deserialización y conexión se convierten en mensajes controlados antes
 de llegar a la interfaz.
 

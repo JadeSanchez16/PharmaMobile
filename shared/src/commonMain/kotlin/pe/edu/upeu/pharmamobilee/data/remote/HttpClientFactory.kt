@@ -34,7 +34,7 @@ fun crearHttpClient(
 
     install(Logging) {
         logger = Logger.SIMPLE
-        level = LogLevel.ALL
+        level = LogLevel.HEADERS
     }
 
     install(HttpTimeout) {
