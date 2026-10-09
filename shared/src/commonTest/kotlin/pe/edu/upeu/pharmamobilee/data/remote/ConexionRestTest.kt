@@ -22,6 +22,25 @@ import kotlin.test.assertTrue
 class ConexionRestTest {
 
     @Test
+    fun respuesta200EntregaListaDeserializada() = runTest {
+        val repository = crearRepositorio(
+            engine = MockEngine {
+                respond(
+                    content = respuestaConCampoDesconocido,
+                    status = HttpStatusCode.OK,
+                    headers = cabecerasJson
+                )
+            }
+        )
+
+        val resultado = repository.listar()
+
+        assertTrue(resultado.isSuccess)
+        assertEquals(1, resultado.getOrThrow().size)
+        assertEquals("Producto de prueba", resultado.getOrThrow().single().nombre)
+    }
+
+    @Test
     fun respuesta404SeConvierteEnMensajeEntendible() = runTest {
         val repository = crearRepositorio(
             engine = MockEngine {
@@ -69,6 +88,7 @@ class ConexionRestTest {
         val error = repository.listar().exceptionOrNull()
 
         assertEquals(ErrorApi.Servidor, (error as ErrorApiException).error)
+        assertTrue(error.contieneCausa<SerializationException>())
     }
 
     @Test
@@ -88,6 +108,7 @@ class ConexionRestTest {
         val error = repository.listar().exceptionOrNull()
 
         assertEquals(ErrorApi.TiempoAgotado, (error as ErrorApiException).error)
+        assertTrue(error.contieneCausa<HttpRequestTimeoutException>())
     }
 
     private fun crearRepositorio(

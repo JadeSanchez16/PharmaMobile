@@ -60,6 +60,25 @@ corutina siempre se relanza. El `ViewModel` mantiene por separado la fase del
 listado y la operación CRUD, expone errores por campo y recarga el inventario
 después de crear, actualizar o eliminar.
 
+### Pruebas de conexión de la Actividad Autónoma 07
+
+`ConexionRestTest` verifica de forma controlada los cinco escenarios exigidos:
+
+1. respuesta HTTP 200 y lista deserializada;
+2. respuesta 404 convertida en `ErrorApi.NoEncontrado`;
+3. pérdida de conexión comprobada en el emulador con mensaje y reintento;
+4. timeout temporal de 1 ms convertido en `ErrorApi.TiempoAgotado`;
+5. campo JSON desconocido aceptado con `ignoreUnknownKeys = true` y rechazado
+   con una causa `SerializationException` cuando se desactiva.
+
+La configuración normal permanece en 15 000 ms y
+`ignoreUnknownKeys = true`; los valores alternativos solo se inyectan en
+`MockEngine` durante la prueba. La suite se ejecuta con:
+
+```powershell
+.\gradlew.bat :shared:testAndroidHostTest --tests "*ConexionRestTest"
+```
+
 ## Manejo de errores
 
 La capa de datos convierte los fallos técnicos en `ErrorApi` antes de que
