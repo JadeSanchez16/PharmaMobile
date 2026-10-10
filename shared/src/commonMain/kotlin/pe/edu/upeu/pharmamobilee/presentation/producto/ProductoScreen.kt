@@ -170,8 +170,7 @@ private fun ProductoContenido(
                     onEditarProducto = onEditarProducto,
                     onEliminarProducto = onEliminarProducto,
                     onCompartirProducto = onCompartirProducto,
-                    eliminando = (uiState.operacion as? ProductoOperacion.EnCurso)
-                        ?.tipo == ProductoOperacion.Tipo.Eliminar
+                    accionesHabilitadas = uiState.operacion !is ProductoOperacion.EnCurso
                 )
             }
 
@@ -299,7 +298,7 @@ private fun ProductoFormulario(
 
             Button(
                 onClick = onRegistrar,
-                enabled = !guardando,
+                enabled = operacionEnCurso == null,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)
             ) {
                 if (guardando) {
@@ -330,7 +329,7 @@ private fun ProductoFormulario(
             if (uiState.productoEnEdicionId != null) {
                 OutlinedButton(
                     onClick = onCancelarEdicion,
-                    enabled = !guardando,
+                    enabled = operacionEnCurso == null,
                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
                 ) {
                     Text("Cancelar edición")

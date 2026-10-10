@@ -69,7 +69,7 @@ fun InventarioTabs(
     onEditarProducto: ((Producto) -> Unit)?,
     onEliminarProducto: ((Long) -> Unit)?,
     onCompartirProducto: ((Producto) -> Unit)?,
-    eliminando: Boolean,
+    accionesHabilitadas: Boolean,
     modifier: Modifier = Modifier
 ) {
     var tabSeleccionada by remember {
@@ -148,8 +148,9 @@ fun InventarioTabs(
             productos = productosFiltrados,
             onEditarProducto = onEditarProducto,
             onCompartirProducto = onCompartirProducto,
+            accionesHabilitadas = accionesHabilitadas,
             onSolicitarEliminar = {
-                if (!eliminando) productoAEliminar = it
+                if (accionesHabilitadas) productoAEliminar = it
             }
         )
     }
@@ -163,6 +164,7 @@ fun InventarioTabs(
             },
             confirmButton = {
                 TextButton(
+                    enabled = accionesHabilitadas,
                     onClick = {
                         productoAEliminar = null
                         onEliminarProducto?.invoke(producto.id)
@@ -185,6 +187,7 @@ private fun ListaProductos(
     productos: List<ProductoUi>,
     onEditarProducto: ((Producto) -> Unit)?,
     onCompartirProducto: ((Producto) -> Unit)?,
+    accionesHabilitadas: Boolean,
     onSolicitarEliminar: (ProductoUi) -> Unit
 ) {
     if (productos.isEmpty()) {
@@ -221,6 +224,7 @@ private fun ListaProductos(
                 producto = producto,
                 onEditar = onEditarProducto?.let { { it(productoVisible) } },
                 onCompartir = onCompartirProducto?.let { { it(productoVisible) } },
+                accionesHabilitadas = accionesHabilitadas,
                 onEliminar = { onSolicitarEliminar(producto) }
             )
         }
@@ -232,7 +236,8 @@ fun ProductCard(
     producto: ProductoUi,
     onEditar: (() -> Unit)?,
     onCompartir: (() -> Unit)?,
-    onEliminar: (() -> Unit)?
+    onEliminar: (() -> Unit)?,
+    accionesHabilitadas: Boolean = true
 ) {
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -289,6 +294,7 @@ fun ProductCard(
                     if (onEditar != null) {
                         FilledTonalIconButton(
                             onClick = onEditar,
+                            enabled = accionesHabilitadas,
                             colors = IconButtonDefaults.filledTonalIconButtonColors(
                                 containerColor = MaterialTheme.colorScheme.secondaryContainer,
                                 contentColor = MaterialTheme.colorScheme.onSecondaryContainer
@@ -303,6 +309,7 @@ fun ProductCard(
                     if (onEliminar != null) {
                         FilledTonalIconButton(
                             onClick = onEliminar,
+                            enabled = accionesHabilitadas,
                             colors = IconButtonDefaults.filledTonalIconButtonColors(
                                 containerColor = MaterialTheme.colorScheme.errorContainer,
                                 contentColor = MaterialTheme.colorScheme.onErrorContainer

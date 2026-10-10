@@ -181,6 +181,11 @@ class ProductoViewModelFlujoTest {
                 ProductoOperacion.EnCurso(ProductoOperacion.Tipo.Eliminar),
                 viewModel.uiState.value.operacion
             )
+            assertIs<ProductoFase.ConProductos>(viewModel.uiState.value.fase)
+            assertEquals(producto, viewModel.uiState.value.productos.single().producto)
+            viewModel.eliminarProducto(producto.id)
+            runCurrent()
+            assertEquals(1, repositorio.solicitudesEliminacion)
 
             permitirEliminacion.complete(Unit)
             advanceUntilIdle()
@@ -253,6 +258,8 @@ class ProductoViewModelFlujoTest {
             private set
         var actualizaciones: Int = 0
             private set
+        var solicitudesEliminacion: Int = 0
+            private set
 
         override suspend fun registrar(producto: Producto): Result<Producto> = runCatching {
             errorAlRegistrar?.let { throw it }
@@ -278,6 +285,7 @@ class ProductoViewModelFlujoTest {
         }
 
         override suspend fun eliminar(id: Long): Result<Unit> = runCatching {
+            solicitudesEliminacion++
             permitirEliminacion?.await()
             check(productosGuardados.removeAll { it.id == id })
         }
