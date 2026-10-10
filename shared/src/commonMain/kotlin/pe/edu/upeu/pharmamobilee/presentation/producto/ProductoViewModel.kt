@@ -57,19 +57,17 @@ class ProductoViewModel(
     fun guardarProducto() {
         if (_uiState.value.operacion is ProductoOperacion.EnCurso) return
 
+        val estado = _uiState.value
+        val editando = estado.productoEnEdicionId != null
+        val tipo = if (editando) {
+            ProductoOperacion.Tipo.Actualizar
+        } else {
+            ProductoOperacion.Tipo.Crear
+        }
+        // Reservar la operación antes de lanzar la corrutina evita dos pulsaciones en cola.
+        limpiarMensajes()
+        _uiState.update { it.copy(operacion = ProductoOperacion.EnCurso(tipo)) }
         viewModelScope.launch {
-            limpiarMensajes()
-            val estado = _uiState.value
-            val editando = estado.productoEnEdicionId != null
-            val tipo = if (editando) {
-                ProductoOperacion.Tipo.Actualizar
-            } else {
-                ProductoOperacion.Tipo.Crear
-            }
-            _uiState.update {
-                it.copy(operacion = ProductoOperacion.EnCurso(tipo))
-            }
-
             val resultado = estado.productoEnEdicionId?.let { id ->
                 actualizarProductoUseCase(
                     id = id,
@@ -105,16 +103,13 @@ class ProductoViewModel(
     fun eliminarProducto(id: Long) {
         if (_uiState.value.operacion is ProductoOperacion.EnCurso) return
 
+        limpiarMensajes()
+        _uiState.update {
+            it.copy(
+                operacion = ProductoOperacion.EnCurso(ProductoOperacion.Tipo.Eliminar, id)
+            )
+        }
         viewModelScope.launch {
-            limpiarMensajes()
-            _uiState.update {
-                it.copy(
-                    operacion = ProductoOperacion.EnCurso(
-                        ProductoOperacion.Tipo.Eliminar
-                    )
-                )
-            }
-
             eliminarProductoUseCase(id).getOrElse { error ->
                 manejarFalloOperacion(error)
                 return@launch

@@ -49,6 +49,8 @@ import pe.edu.upeu.pharmamobilee.domain.model.OrigenProducto
 import pe.edu.upeu.pharmamobilee.domain.model.Producto
 import pe.edu.upeu.pharmamobilee.presentacion.components.SectionHeader
 import pe.edu.upeu.pharmamobilee.presentation.producto.ProductoUi
+import pe.edu.upeu.pharmamobilee.presentation.producto.ProductoOperacion
+import pe.edu.upeu.pharmamobilee.presentation.producto.eliminando
 import pe.edu.upeu.pharmamobilee.theme.AzulClaro
 import pe.edu.upeu.pharmamobilee.theme.AzulNoche
 
@@ -69,7 +71,7 @@ fun InventarioTabs(
     onEditarProducto: ((Producto) -> Unit)?,
     onEliminarProducto: ((Long) -> Unit)?,
     onCompartirProducto: ((Producto) -> Unit)?,
-    accionesHabilitadas: Boolean,
+    operacion: ProductoOperacion,
     modifier: Modifier = Modifier
 ) {
     var tabSeleccionada by remember {
@@ -148,9 +150,9 @@ fun InventarioTabs(
             productos = productosFiltrados,
             onEditarProducto = onEditarProducto,
             onCompartirProducto = onCompartirProducto,
-            accionesHabilitadas = accionesHabilitadas,
+            operacion = operacion,
             onSolicitarEliminar = {
-                if (accionesHabilitadas) productoAEliminar = it
+                if (operacion !is ProductoOperacion.EnCurso) productoAEliminar = it
             }
         )
     }
@@ -164,7 +166,7 @@ fun InventarioTabs(
             },
             confirmButton = {
                 TextButton(
-                    enabled = accionesHabilitadas,
+                    enabled = !operacion.eliminando(producto.id),
                     onClick = {
                         productoAEliminar = null
                         onEliminarProducto?.invoke(producto.id)
@@ -187,7 +189,7 @@ private fun ListaProductos(
     productos: List<ProductoUi>,
     onEditarProducto: ((Producto) -> Unit)?,
     onCompartirProducto: ((Producto) -> Unit)?,
-    accionesHabilitadas: Boolean,
+    operacion: ProductoOperacion,
     onSolicitarEliminar: (ProductoUi) -> Unit
 ) {
     if (productos.isEmpty()) {
@@ -224,7 +226,7 @@ private fun ListaProductos(
                 producto = producto,
                 onEditar = onEditarProducto?.let { { it(productoVisible) } },
                 onCompartir = onCompartirProducto?.let { { it(productoVisible) } },
-                accionesHabilitadas = accionesHabilitadas,
+                eliminando = operacion.eliminando(producto.id),
                 onEliminar = { onSolicitarEliminar(producto) }
             )
         }
@@ -237,7 +239,7 @@ fun ProductCard(
     onEditar: (() -> Unit)?,
     onCompartir: (() -> Unit)?,
     onEliminar: (() -> Unit)?,
-    accionesHabilitadas: Boolean = true
+    eliminando: Boolean = false
 ) {
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -294,7 +296,6 @@ fun ProductCard(
                     if (onEditar != null) {
                         FilledTonalIconButton(
                             onClick = onEditar,
-                            enabled = accionesHabilitadas,
                             colors = IconButtonDefaults.filledTonalIconButtonColors(
                                 containerColor = MaterialTheme.colorScheme.secondaryContainer,
                                 contentColor = MaterialTheme.colorScheme.onSecondaryContainer
@@ -309,7 +310,7 @@ fun ProductCard(
                     if (onEliminar != null) {
                         FilledTonalIconButton(
                             onClick = onEliminar,
-                            enabled = accionesHabilitadas,
+                            enabled = !eliminando,
                             colors = IconButtonDefaults.filledTonalIconButtonColors(
                                 containerColor = MaterialTheme.colorScheme.errorContainer,
                                 contentColor = MaterialTheme.colorScheme.onErrorContainer

@@ -22,6 +22,8 @@ import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ProductoViewModelFlujoTest {
@@ -175,17 +177,24 @@ class ProductoViewModelFlujoTest {
             advanceUntilIdle()
 
             viewModel.eliminarProducto(producto.id)
+            // Intentos en la misma vuelta, antes de que se ejecute la corrutina.
+            viewModel.eliminarProducto(producto.id)
+            viewModel.guardarProducto()
             runCurrent()
 
             assertEquals(
-                ProductoOperacion.EnCurso(ProductoOperacion.Tipo.Eliminar),
+                ProductoOperacion.EnCurso(ProductoOperacion.Tipo.Eliminar, producto.id),
                 viewModel.uiState.value.operacion
             )
             assertIs<ProductoFase.ConProductos>(viewModel.uiState.value.fase)
             assertEquals(producto, viewModel.uiState.value.productos.single().producto)
             viewModel.eliminarProducto(producto.id)
+            viewModel.editarProducto(producto)
+            viewModel.cancelarEdicion()
             runCurrent()
             assertEquals(1, repositorio.solicitudesEliminacion)
+            assertEquals(0, repositorio.registros)
+            assertEquals(null, viewModel.uiState.value.productoEnEdicionId)
 
             permitirEliminacion.complete(Unit)
             advanceUntilIdle()
@@ -193,6 +202,73 @@ class ProductoViewModelFlujoTest {
             assertIs<ProductoFase.SinProductos>(viewModel.uiState.value.fase)
             assertIs<ProductoOperacion.Inactiva>(viewModel.uiState.value.operacion)
             assertEquals("Producto eliminado correctamente", viewModel.uiState.value.mensajeExito)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun soloElBotonCorrespondienteSeDeshabilitaSegunLaOperacion() {
+        val inactiva = ProductoOperacion.Inactiva
+        val fallida = ProductoOperacion.Fallida("Sin conexión")
+        for (operacion in listOf(inactiva, fallida)) {
+            assertFalse(operacion.guardando)
+            assertFalse(operacion.eliminando(5L))
+        }
+        for (tipo in listOf(ProductoOperacion.Tipo.Crear, ProductoOperacion.Tipo.Actualizar)) {
+            val guardando = ProductoOperacion.EnCurso(tipo)
+            assertTrue(guardando.guardando)
+            assertFalse(guardando.eliminando(5L))
+        }
+        val eliminando = ProductoOperacion.EnCurso(ProductoOperacion.Tipo.Eliminar, 5L)
+        assertFalse(eliminando.guardando)
+        assertTrue(eliminando.eliminando(5L))
+        assertFalse(eliminando.eliminando(6L))
+    }
+
+    @Test
+    fun guardarConservaListadoYRechazaMutacionesSimultaneas() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            for (editando in listOf(false, true)) {
+                val producto = Producto(id = 5L, nombre = "Alcohol", precio = 2.0, stock = 10)
+                val permitirGuardado = CompletableDeferred<Unit>()
+                val repositorio = ProductoRepositoryFalso(
+                    productos = listOf(producto), permitirGuardado = permitirGuardado
+                )
+                val viewModel = crearViewModel(repositorio)
+                advanceUntilIdle()
+                if (editando) viewModel.editarProducto(producto)
+                viewModel.actualizarNombre("Alcohol actualizado")
+                viewModel.actualizarPrecio("3.00")
+                viewModel.actualizarStock("10")
+
+                viewModel.guardarProducto()
+                viewModel.guardarProducto()
+                viewModel.eliminarProducto(producto.id)
+                viewModel.editarProducto(producto)
+                viewModel.cancelarEdicion()
+                runCurrent()
+
+                assertIs<ProductoFase.ConProductos>(viewModel.uiState.value.fase)
+                assertEquals(producto, viewModel.uiState.value.productos.single().producto)
+                val operacion = assertIs<ProductoOperacion.EnCurso>(viewModel.uiState.value.operacion)
+                assertEquals(
+                    if (editando) ProductoOperacion.Tipo.Actualizar else ProductoOperacion.Tipo.Crear,
+                    operacion.tipo
+                )
+                assertTrue(operacion.guardando)
+                assertFalse(operacion.eliminando(producto.id))
+                assertEquals(if (editando) producto.id else null, viewModel.uiState.value.productoEnEdicionId)
+                assertEquals(1, repositorio.registros + repositorio.actualizaciones)
+                assertEquals(0, repositorio.solicitudesEliminacion)
+
+                permitirGuardado.complete(Unit)
+                advanceUntilIdle()
+                assertIs<ProductoOperacion.Inactiva>(viewModel.uiState.value.operacion)
+                assertIs<ProductoFase.ConProductos>(viewModel.uiState.value.fase)
+                assertTrue(viewModel.uiState.value.productos.any { it.nombre == "Alcohol actualizado" })
+            }
         } finally {
             Dispatchers.resetMain()
         }
@@ -251,7 +327,8 @@ class ProductoViewModelFlujoTest {
         productos: List<Producto> = emptyList(),
         private val errorAlListar: Throwable? = null,
         private val errorAlRegistrar: Throwable? = null,
-        private val permitirEliminacion: CompletableDeferred<Unit>? = null
+        private val permitirEliminacion: CompletableDeferred<Unit>? = null,
+        private val permitirGuardado: CompletableDeferred<Unit>? = null
     ) : ProductoRepository {
         private val productosGuardados = productos.toMutableList()
         var registros: Int = 0
@@ -264,11 +341,13 @@ class ProductoViewModelFlujoTest {
         override suspend fun registrar(producto: Producto): Result<Producto> = runCatching {
             errorAlRegistrar?.let { throw it }
             registros++
+            permitirGuardado?.await()
             producto.copy(id = 100L + registros).also(productosGuardados::add)
         }
 
         override suspend fun actualizar(producto: Producto): Result<Producto> = runCatching {
             actualizaciones++
+            permitirGuardado?.await()
             val indice = productosGuardados.indexOfFirst { it.id == producto.id }
             check(indice >= 0)
             productosGuardados[indice] = producto

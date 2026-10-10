@@ -170,7 +170,7 @@ private fun ProductoContenido(
                     onEditarProducto = onEditarProducto,
                     onEliminarProducto = onEliminarProducto,
                     onCompartirProducto = onCompartirProducto,
-                    accionesHabilitadas = uiState.operacion !is ProductoOperacion.EnCurso
+                    operacion = uiState.operacion
                 )
             }
 
@@ -192,9 +192,7 @@ private fun ProductoFormulario(
     expandido: Boolean,
     onExpandidoChange: (Boolean) -> Unit
 ) {
-    val operacionEnCurso = uiState.operacion as? ProductoOperacion.EnCurso
-    val guardando = operacionEnCurso?.tipo == ProductoOperacion.Tipo.Crear ||
-        operacionEnCurso?.tipo == ProductoOperacion.Tipo.Actualizar
+    val guardando = uiState.operacion.guardando
 
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -298,7 +296,7 @@ private fun ProductoFormulario(
 
             Button(
                 onClick = onRegistrar,
-                enabled = operacionEnCurso == null,
+                enabled = !guardando,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)
             ) {
                 if (guardando) {
@@ -329,7 +327,6 @@ private fun ProductoFormulario(
             if (uiState.productoEnEdicionId != null) {
                 OutlinedButton(
                     onClick = onCancelarEdicion,
-                    enabled = operacionEnCurso == null,
                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
                 ) {
                     Text("Cancelar edición")
