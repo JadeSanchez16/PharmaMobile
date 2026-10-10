@@ -3,12 +3,14 @@ package pe.edu.upeu.pharmamobilee.data.remote
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.client.engine.mock.respondError
+import io.ktor.client.network.sockets.SocketTimeoutException
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
+import kotlinx.io.IOException
 import pe.edu.upeu.pharmamobilee.data.repository.ProductoRepositoryImpl
 import pe.edu.upeu.pharmamobilee.domain.error.ErrorApi
 import pe.edu.upeu.pharmamobilee.domain.error.ErrorApiException
@@ -64,6 +66,22 @@ class EjecutarLlamadaTest {
         assertFailsWith<CancellationException> {
             ejecutarLlamada<Unit> { throw CancellationException("cancelada") }
         }
+    }
+
+    @Test
+    fun timeoutDeSocketSeTraduceComoTiempoAgotado() = runTest {
+        val result = ejecutarLlamada<Unit> {
+            throw SocketTimeoutException("socket timeout real", null)
+        }
+        val exception = result.exceptionOrNull() as ErrorApiException
+        assertEquals(ErrorApi.TiempoAgotado, exception.error)
+    }
+
+    @Test
+    fun falloDeConexionSinTimeoutConservaSinConexion() = runTest {
+        val result = ejecutarLlamada<Unit> { throw IOException("sin conexión") }
+        val exception = result.exceptionOrNull() as ErrorApiException
+        assertEquals(ErrorApi.SinConexion, exception.error)
     }
 
     private fun repositoryConRespuesta(

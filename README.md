@@ -93,6 +93,12 @@ lleguen al `ViewModel`:
 | Backend inaccesible | `SinConexion` | Mensaje de conexión y opción de reintentar |
 | Tiempo de espera agotado | `TiempoAgotado` | Mensaje para intentar nuevamente |
 
+Los timeouts de socket (`SocketTimeoutException` de Ktor, equivalente a
+`java.net.SocketTimeoutException` en Android/JVM) también se traducen como
+`TiempoAgotado`, antes de capturar `IOException`. Los demás fallos de conexión
+conservan `SinConexion`. Esta distinción se verificó en el emulador durante una
+espera controlada de PharmaSoft, sin modificar el timeout normal ni los datos.
+
 PharmaSoft realiza borrado lógico. Por ese motivo, un segundo `DELETE` sobre el
 mismo producto devuelve actualmente HTTP 409 y se representa como
 `ErrorApi.Conflicto`; no se documenta como 404 porque ese no es el comportamiento

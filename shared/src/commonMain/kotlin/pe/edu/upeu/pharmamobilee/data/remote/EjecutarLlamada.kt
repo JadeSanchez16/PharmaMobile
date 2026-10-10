@@ -1,6 +1,7 @@
 package pe.edu.upeu.pharmamobilee.data.remote
 
 import io.ktor.client.call.body
+import io.ktor.client.network.sockets.SocketTimeoutException
 import io.ktor.client.plugins.ClientRequestException
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.plugins.ResponseException
@@ -24,6 +25,8 @@ suspend fun <T> ejecutarLlamada(
 } catch (error: ServerResponseException) {
     Result.failure(ErrorApiException(ErrorApi.Servidor, error))
 } catch (error: HttpRequestTimeoutException) {
+    Result.failure(ErrorApiException(ErrorApi.TiempoAgotado, error))
+} catch (error: SocketTimeoutException) {
     Result.failure(ErrorApiException(ErrorApi.TiempoAgotado, error))
 } catch (error: IOException) {
     Result.failure(ErrorApiException(ErrorApi.SinConexion, error))
