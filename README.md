@@ -100,6 +100,21 @@ real del backend. `CancellationException` no se convierte en un error visible:
 se relanza para respetar la cancelación estructurada cuando termina el alcance
 de la corutina.
 
+Al salir de Inventario, `DisposableEffect` cancela las solicitudes pendientes
+mediante el ViewModel compartido. La cancelación no se transforma en un mensaje
+de error ni permite una actualización tardía. Al volver se consulta el servidor:
+cancelar el cliente no revierte una mutación que el backend ya recibió.
+La validación local de precio cero conserva su mensaje inline y evita el HTTP;
+la validación remota de precio se verifica por separado, sin retirar esa protección.
+
+La Actividad Autónoma 08 reutiliza las transiciones de
+`ProductoViewModelFlujoTest` en `commonTest` y añade la cancelación al salir.
+`PharmaSoftErroresRealesTest`, en `androidHostTest`, es integración adicional
+contra PharmaSoft y no sustituye el requisito de pruebas comunes. Se activa con
+`$env:PHARMASOFT_PRUEBAS_REALES='true'` antes de Gradle; retirar la variable al
+terminar. Comprueba precio 400, PUT inexistente 404, duplicado 409 y timeout de
+1 ms en un cliente aislado, sin cambiar el timeout normal de 15 segundos.
+
 ## Seguridad de red local
 
 - Android declara `INTERNET` y usa `network_security_config.xml` para autorizar

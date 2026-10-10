@@ -6,6 +6,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.CancellationException
 import pe.edu.upeu.pharmamobilee.domain.error.ErrorApi
 import pe.edu.upeu.pharmamobilee.domain.error.ErrorApiException
 import pe.edu.upeu.pharmamobilee.domain.error.mensajeUsuario
@@ -27,6 +29,9 @@ class ProductoViewModel(
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ProductoUiState())
     val uiState = _uiState.asStateFlow()
+    private var trabajoListado: Job? = null
+    private var trabajoOperacion: Job? = null
+    private var recargaPendiente = false
 
     init {
         cargarProductos()
@@ -67,7 +72,7 @@ class ProductoViewModel(
         // Reservar la operación antes de lanzar la corrutina evita dos pulsaciones en cola.
         limpiarMensajes()
         _uiState.update { it.copy(operacion = ProductoOperacion.EnCurso(tipo)) }
-        viewModelScope.launch {
+        trabajoOperacion = viewModelScope.launch {
             val resultado = estado.productoEnEdicionId?.let { id ->
                 actualizarProductoUseCase(
                     id = id,
@@ -109,7 +114,7 @@ class ProductoViewModel(
                 operacion = ProductoOperacion.EnCurso(ProductoOperacion.Tipo.Eliminar, id)
             )
         }
-        viewModelScope.launch {
+        trabajoOperacion = viewModelScope.launch {
             eliminarProductoUseCase(id).getOrElse { error ->
                 manejarFalloOperacion(error)
                 return@launch
@@ -151,8 +156,26 @@ class ProductoViewModel(
     }
 
     fun cargarProductos() {
-        viewModelScope.launch {
+        trabajoListado?.cancel()
+        trabajoListado = viewModelScope.launch {
             cargarListado(mostrarCarga = true)
+        }
+    }
+
+    fun cancelarSolicitudesAlSalir() {
+        if (trabajoListado?.isActive == true || trabajoOperacion?.isActive == true) {
+            // El servidor puede haber recibido la mutación: reconciliar al volver.
+            recargaPendiente = true
+            trabajoListado?.cancel()
+            trabajoOperacion?.cancel()
+            _uiState.update { it.copy(operacion = ProductoOperacion.Inactiva) }
+        }
+    }
+
+    fun reanudarSolicitudesAlEntrar() {
+        if (recargaPendiente) {
+            recargaPendiente = false
+            cargarProductos()
         }
     }
 
@@ -164,6 +187,7 @@ class ProductoViewModel(
         }
 
         val resultado = listarProductosUseCase()
+        (resultado.exceptionOrNull() as? CancellationException)?.let { throw it }
         resultado.onSuccess { productos ->
             _uiState.update {
                 it.copy(
@@ -211,6 +235,7 @@ class ProductoViewModel(
     }
 
     private fun manejarFalloOperacion(fallo: Throwable) {
+        if (fallo is CancellationException) throw fallo
         when (fallo) {
             is ProductoRegistroException -> _uiState.update {
                 it.copy(

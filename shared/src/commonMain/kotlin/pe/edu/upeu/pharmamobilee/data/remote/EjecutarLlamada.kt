@@ -38,9 +38,13 @@ suspend fun <T> ejecutarLlamada(
 private suspend fun traducirErrorCliente(
     error: ClientRequestException
 ): ErrorApi {
-    val cuerpo = runCatching {
+    val cuerpo = try {
         error.response.body<ErrorResponseDto>()
-    }.getOrNull()
+    } catch (cancelacion: CancellationException) {
+        throw cancelacion
+    } catch (_: Exception) {
+        null
+    }
 
     return when (error.response.status.value) {
         400 -> ErrorApi.Validacion(cuerpo?.validationErrors.orEmpty())

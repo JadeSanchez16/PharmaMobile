@@ -157,6 +157,7 @@ class ProductoViewModelFlujoTest {
             assertEquals(errores["nombre"], viewModel.uiState.value.nombreError)
             assertEquals(errores["precio"], viewModel.uiState.value.precioError)
             assertEquals(errores["stock"], viewModel.uiState.value.stockError)
+            assertIs<ProductoFase.SinProductos>(viewModel.uiState.value.fase)
             assertIs<ProductoOperacion.Inactiva>(viewModel.uiState.value.operacion)
         } finally {
             Dispatchers.resetMain()
@@ -269,6 +270,38 @@ class ProductoViewModelFlujoTest {
                 assertIs<ProductoFase.ConProductos>(viewModel.uiState.value.fase)
                 assertTrue(viewModel.uiState.value.productos.any { it.nombre == "Alcohol actualizado" })
             }
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun salirCancelaGuardadoSinErrorNiActualizacionTardia() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val permitirGuardado = CompletableDeferred<Unit>()
+            val producto = Producto(id = 5L, nombre = "Alcohol", precio = 2.0, stock = 10)
+            val repositorio = ProductoRepositoryFalso(listOf(producto), permitirGuardado = permitirGuardado)
+            val viewModel = crearViewModel(repositorio)
+            advanceUntilIdle()
+            viewModel.actualizarNombre("Temporal cancelado")
+            viewModel.actualizarPrecio("3.00")
+            viewModel.actualizarStock("10")
+            viewModel.guardarProducto()
+            runCurrent()
+            assertIs<ProductoOperacion.EnCurso>(viewModel.uiState.value.operacion)
+            viewModel.cancelarSolicitudesAlSalir()
+            runCurrent()
+            val estadoAlSalir = viewModel.uiState.value
+            assertIs<ProductoOperacion.Inactiva>(estadoAlSalir.operacion)
+            assertIs<ProductoFase.ConProductos>(estadoAlSalir.fase)
+            assertEquals(null, estadoAlSalir.mensajeExito)
+            permitirGuardado.complete(Unit)
+            advanceUntilIdle()
+            assertEquals(estadoAlSalir, viewModel.uiState.value)
+            viewModel.reanudarSolicitudesAlEntrar()
+            advanceUntilIdle()
+            assertEquals(listOf(producto), viewModel.uiState.value.productos.map { it.producto })
         } finally {
             Dispatchers.resetMain()
         }
