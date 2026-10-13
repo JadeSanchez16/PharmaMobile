@@ -131,6 +131,52 @@ terminar. Comprueba precio 400, PUT inexistente 404, duplicado 409 y timeout de
 - La excepción de tráfico en claro es solo para desarrollo; producción debe usar
   HTTPS.
 
+## Autenticación
+
+PharmaMobile consume la autenticación JWT real de PharmaSoft mediante
+`POST /api/v1/auth/login`. La aplicación envía únicamente `username` y
+`password`; la contraseña no se persiste. La respuesta se convierte en una
+sesión de dominio con el usuario, nombre completo, roles y permisos.
+
+El JWT se conserva cifrado en cada plataforma:
+
+- Android usa una clave AES de Android Keystore y guarda en
+  `SharedPreferences` solamente el texto cifrado y su vector de inicialización.
+- iOS usa Keychain Services (`SecItemAdd`, `SecItemCopyMatching` y
+  `SecItemDelete`). Esta implementación compila desde Windows, pero su ejecución
+  real continúa pendiente de macOS con Xcode.
+
+Ktor instala `Auth` con esquema Bearer. `loadTokens` recupera el JWT desde
+`AlmacenSeguro` y `sendWithoutRequest` excluye la ruta pública `/auth/login`.
+Las solicitudes protegidas reciben automáticamente `Authorization: Bearer
+<token>`. El registro de depuración usa nivel `HEADERS` y sanea esta cabecera;
+nunca imprime el token ni los cuerpos de login.
+
+Al iniciar la aplicación, un token persistido se valida con
+`GET /api/v1/auth/me`. Un HTTP 401 en una ruta protegida borra la sesión y
+regresa al acceso; un HTTP 403 conserva la sesión y se presenta como falta de
+permiso. Cerrar sesión elimina el JWT local y limpia la caché Bearer.
+
+La interfaz aplica los permisos devueltos por PharmaSoft:
+
+| Rol | Acceso visible en PharmaMobile |
+| --- | --- |
+| `ADMIN` | Catálogo, clientes, ventas, reportes y administración según sus permisos |
+| `VENDEDOR` | Lectura de catálogo, clientes y ventas; sin escritura de catálogo |
+| `ALMACENERO` | Lectura y escritura de catálogo; sin clientes, ventas ni reportes |
+
+Los usuarios de desarrollo verificados son `admin`, `vendedor` y `almacen`.
+Sus contraseñas no se documentan ni se versionan. Para ejecutar Android, iniciar
+PharmaSoft en el puerto 8080, seleccionar el Pixel 9a y usar una cuenta de
+desarrollo autorizada. Las verificaciones automáticas se ejecutan con:
+
+```powershell
+.\gradlew.bat :shared:allTests :androidApp:assembleDebug --rerun-tasks
+```
+
+La verificación del flujo real en iOS requiere macOS y Xcode; no se sustituye
+con capturas simuladas.
+
 ## Capacidades nativas
 
 La sesión 09 incorpora capacidades específicas de Android e iOS sin introducir
