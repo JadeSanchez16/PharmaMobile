@@ -7,6 +7,18 @@ import pe.edu.upeu.pharmamobilee.domain.model.Producto
 class ProductoUiTest {
 
     @Test
+    fun formateaPrecioEnSolesAlMapearAPresentacion() {
+        val productoUi = Producto(
+            id = 1,
+            nombre = "Paracetamol 500 mg",
+            precio = 4.5,
+            stock = 120
+        ).toUi()
+
+        assertEquals("S/ 4.50", productoUi.precio.replace('\u00A0', ' '))
+    }
+
+    @Test
     fun ocultaEtiquetaDeSesionEnNombreYCategoria() {
         val producto = Producto(
             id = 1,

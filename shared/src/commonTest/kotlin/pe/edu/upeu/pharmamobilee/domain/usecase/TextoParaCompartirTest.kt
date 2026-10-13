@@ -1,7 +1,7 @@
 package pe.edu.upeu.pharmamobilee.domain.usecase
 
 import kotlin.test.Test
-import kotlin.test.assertContains
+import kotlin.test.assertEquals
 import pe.edu.upeu.pharmamobilee.domain.model.Producto
 
 class TextoParaCompartirTest {
@@ -16,8 +16,9 @@ class TextoParaCompartirTest {
 
         val texto = producto.comoTextoParaCompartir()
 
-        assertContains(texto, "Paracetamol 500 mg")
-        assertContains(texto, "S/")
-        assertContains(texto, "Stock: 120")
+        assertEquals(
+            "Paracetamol 500 mg — S/ 4.50 · Stock: 120",
+            texto.replace('\u00A0', ' ')
+        )
     }
 }
