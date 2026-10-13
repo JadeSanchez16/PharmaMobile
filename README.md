@@ -167,6 +167,54 @@ Android se compila y prueba desde Windows. La compilación y ejecución real de
 `iosMain`, el formato monetario iOS y la hoja de compartir permanecen pendientes
 de una máquina macOS con Xcode; no se presentan como evidencias ejecutadas.
 
+## Código específico de plataforma
+
+La Actividad Autónoma 09 distingue las declaraciones `expect/actual` de las
+capacidades resueltas mediante interfaz e inyección. El inventario vigente es:
+
+- **Plataforma:** `shared/src/commonMain/.../Platform.kt` declara
+  `expect fun getPlatform(): Platform`. Android implementa el `actual` en
+  `shared/src/androidMain/.../Platform.android.kt` con `Build.VERSION.SDK_INT`;
+  iOS lo implementa en `shared/src/iosMain/.../Platform.ios.kt` con `UIDevice`.
+- **Formato monetario:** `shared/src/commonMain/.../platform/Formato.kt` declara
+  `expect fun formatearSoles(valor: Double): String`. Android usa
+  `NumberFormat` y `Locale.forLanguageTag("es-PE")` en `Formato.android.kt`;
+  iOS usa `NSNumberFormatter` y `NSLocale("es_PE")` en `Formato.ios.kt`.
+- **Módulo de inyección:** `shared/src/commonMain/.../di/AppModule.kt` declara
+  `expect val platformModule: Module`. `PlatformModule.android.kt` registra
+  OkHttp, la URL del emulador y `CompartidorAndroid(androidContext())`;
+  `PlatformModule.ios.kt` registra Darwin, la URL local y `CompartidorIos()`.
+- **Información del dispositivo:**
+  `shared/src/commonMain/.../platform/InfoDispositivo.kt` declara
+  `expect class InfoDispositivo()` con `sistema` y `version`.
+  `InfoDispositivo.android.kt` obtiene la versión mediante
+  `Build.VERSION.RELEASE`; `InfoDispositivo.ios.kt` consulta
+  `UIDevice.currentDevice.systemName()` y `systemVersion`. La pantalla común
+  `presentation/acerca/AcercaScreen.kt` muestra ambos valores dinámicos desde la
+  opción **Acerca de** de la navegación.
+
+**Compartir producto no es una declaración expect.**
+`domain/platform/Compartidor.kt` es una interfaz común. Android la implementa
+con `Intent.ACTION_SEND` y un `Context`; iOS utiliza
+`UIActivityViewController`. Koin selecciona la implementación desde el
+`platformModule` de cada target.
+
+Para ejecutar Android, iniciar PharmaSoft en el puerto 8080, abrir el proyecto,
+seleccionar el Pixel 9a y ejecutar `androidApp`. La opción **Acerca de** debe
+mostrar `Android` y la versión devuelta por el emulador. Las pruebas y el APK se
+verifican con:
+
+```powershell
+$env:PHARMASOFT_PRUEBAS_REALES='true'
+.\gradlew.bat :shared:allTests :androidApp:assembleDebug --rerun-tasks
+```
+
+Para iOS se requiere macOS con Xcode: iniciar PharmaSoft, abrir
+`iosApp/iosApp.xcodeproj`, seleccionar un simulador y verificar Inventario,
+Compartir y Acerca de. En Windows se compila `iosMain` hasta el nivel permitido
+por Kotlin/Native, pero no se afirma ejecución real de iOS ni se sustituyen sus
+capturas.
+
 ### Verificación de la Guía Práctica 09
 
 En Windows, la verificación disponible compila el APK, ejecuta las pruebas del
