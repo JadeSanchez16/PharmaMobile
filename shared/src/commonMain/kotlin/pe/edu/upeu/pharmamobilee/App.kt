@@ -15,6 +15,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.LocalPharmacy
 import androidx.compose.material.icons.filled.Medication
@@ -54,6 +55,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import pe.edu.upeu.pharmamobilee.navigation.Screen
+import pe.edu.upeu.pharmamobilee.presentation.acerca.AcercaScreen
 import pe.edu.upeu.pharmamobilee.presentacion.cliente.ClienteScreen
 import pe.edu.upeu.pharmamobilee.presentacion.inicio.InicioScreen
 import pe.edu.upeu.pharmamobilee.presentacion.pedido.PedidoScreen
@@ -78,7 +80,8 @@ private val opcionesNavegacion = listOf(
     OpcionNavegacion(Screen.Inicio, "Inicio", Icons.Default.Home),
     OpcionNavegacion(Screen.Productos, "Productos", Icons.Default.Medication),
     OpcionNavegacion(Screen.Clientes, "Clientes", Icons.Default.Person),
-    OpcionNavegacion(Screen.Pedidos, "Pedidos", Icons.Default.ShoppingCart)
+    OpcionNavegacion(Screen.Pedidos, "Pedidos", Icons.Default.ShoppingCart),
+    OpcionNavegacion(Screen.Acerca, "Acerca de", Icons.Default.Info)
 )
 
 @Composable
@@ -331,6 +334,10 @@ private fun PharmaMobilScaffold(
                 Screen.Pedidos -> {
                     PedidoScreen()
                 }
+
+                Screen.Acerca -> {
+                    AcercaScreen()
+                }
             }
         }
     }
@@ -452,5 +459,6 @@ private fun tituloPantalla(
         Screen.Productos -> "Inventario"
         Screen.Clientes -> "Clientes"
         Screen.Pedidos -> "Pedidos"
+        Screen.Acerca -> "Acerca de"
     }
 }
