@@ -46,7 +46,9 @@ fun InicioScreen(
     productosBajoStock: Int,
     onProductosClick: () -> Unit,
     onClientesClick: () -> Unit,
-    onPedidosClick: () -> Unit
+    onPedidosClick: () -> Unit,
+    mostrarClientes: Boolean = true,
+    mostrarPedidos: Boolean = true
 ) {
     Column(
         modifier = Modifier
@@ -63,7 +65,13 @@ fun InicioScreen(
             bajoStock = productosBajoStock,
             onClick = onProductosClick
         )
-        AccesosRapidos(onProductosClick, onClientesClick, onPedidosClick)
+        AccesosRapidos(
+            onProductosClick,
+            onClientesClick,
+            onPedidosClick,
+            mostrarClientes,
+            mostrarPedidos
+        )
     }
 }
 
@@ -154,14 +162,20 @@ private fun IndicadorCard(
 private fun AccesosRapidos(
     onProductosClick: () -> Unit,
     onClientesClick: () -> Unit,
-    onPedidosClick: () -> Unit
+    onPedidosClick: () -> Unit,
+    mostrarClientes: Boolean,
+    mostrarPedidos: Boolean
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Accesos rápidos", style = MaterialTheme.typography.titleLarge)
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             AccesoCard("Productos", Icons.Default.Medication, onProductosClick, Modifier.weight(1f))
-            AccesoCard("Clientes", Icons.Default.Groups, onClientesClick, Modifier.weight(1f))
-            AccesoCard("Pedidos", Icons.Default.ShoppingCartCheckout, onPedidosClick, Modifier.weight(1f))
+            if (mostrarClientes) {
+                AccesoCard("Clientes", Icons.Default.Groups, onClientesClick, Modifier.weight(1f))
+            }
+            if (mostrarPedidos) {
+                AccesoCard("Pedidos", Icons.Default.ShoppingCartCheckout, onPedidosClick, Modifier.weight(1f))
+            }
         }
     }
 }

@@ -58,6 +58,7 @@ import pe.edu.upeu.pharmamobilee.presentacion.producto.InventarioTabs
 @Composable
 fun ProductoScreen(
     viewModel: ProductoViewModel,
+    puedeEditar: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -120,13 +121,15 @@ fun ProductoScreen(
                 ProductoContenido(
                     uiState = uiState,
                     onReintentar = viewModel::cargarProductos,
-                    onEditarProducto = viewModel::editarProducto,
-                    onEliminarProducto = viewModel::eliminarProducto,
+                    onEditarProducto = if (puedeEditar) viewModel::editarProducto else null,
+                    onEliminarProducto = if (puedeEditar) viewModel::eliminarProducto else null,
                     onCompartirProducto = viewModel::compartir
                 )
             }
 
-            if (maxWidth >= 600.dp) {
+            if (!puedeEditar) {
+                inventario()
+            } else if (maxWidth >= 600.dp) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(20.dp),
                     verticalAlignment = Alignment.Top
@@ -153,8 +156,8 @@ fun ProductoScreen(
 private fun ProductoContenido(
     uiState: ProductoUiState,
     onReintentar: () -> Unit,
-    onEditarProducto: (Producto) -> Unit,
-    onEliminarProducto: (Long) -> Unit,
+    onEditarProducto: ((Producto) -> Unit)?,
+    onEliminarProducto: ((Long) -> Unit)?,
     onCompartirProducto: (Producto) -> Unit
 ) {
     when (val fase = uiState.fase) {
