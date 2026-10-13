@@ -88,10 +88,15 @@ class ProductoViewModelFlujoTest {
     }
 
     @Test
-    fun registrarConPrecioCeroMuestraErrorYNoLlamaRepositorio() = runTest {
+    fun precioCeroSeEnviaYLaValidacionDelServidorSeMuestraEnElCampo() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
-            val repositorio = ProductoRepositoryFalso()
+            val mensajeServidor = "El precio debe ser mayor que cero"
+            val repositorio = ProductoRepositoryFalso(
+                errorAlRegistrar = ErrorApiException(
+                    ErrorApi.Validacion(mapOf("precio" to mensajeServidor))
+                )
+            )
             val viewModel = crearViewModel(repositorio)
             advanceUntilIdle()
 
@@ -101,7 +106,8 @@ class ProductoViewModelFlujoTest {
             viewModel.guardarProducto()
             advanceUntilIdle()
 
-            assertEquals("El precio debe ser mayor a 0", viewModel.uiState.value.precioError)
+            assertEquals(mensajeServidor, viewModel.uiState.value.precioError)
+            assertEquals(1, repositorio.solicitudesRegistro)
             assertEquals(0, repositorio.registros)
         } finally {
             Dispatchers.resetMain()
@@ -366,12 +372,15 @@ class ProductoViewModelFlujoTest {
         private val productosGuardados = productos.toMutableList()
         var registros: Int = 0
             private set
+        var solicitudesRegistro: Int = 0
+            private set
         var actualizaciones: Int = 0
             private set
         var solicitudesEliminacion: Int = 0
             private set
 
         override suspend fun registrar(producto: Producto): Result<Producto> = runCatching {
+            solicitudesRegistro++
             errorAlRegistrar?.let { throw it }
             registros++
             permitirGuardado?.await()

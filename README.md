@@ -110,8 +110,10 @@ Al salir de Inventario, `DisposableEffect` cancela las solicitudes pendientes
 mediante el ViewModel compartido. La cancelación no se transforma en un mensaje
 de error ni permite una actualización tardía. Al volver se consulta el servidor:
 cancelar el cliente no revierte una mutación que el backend ya recibió.
-La validación local de precio cero conserva su mensaje inline y evita el HTTP;
-la validación remota de precio se verifica por separado, sin retirar esa protección.
+La validación local conserva los controles de obligatoriedad y formato numérico. La
+regla de rango del precio se valida en PharmaSoft: un valor cero o negativo se envía,
+el HTTP 400 se traduce a `ErrorApi.Validacion` y el mensaje remoto se muestra debajo
+del campo `precio`.
 
 La Actividad Autónoma 08 reutiliza las transiciones de
 `ProductoViewModelFlujoTest` en `commonTest` y añade la cancelación al salir.
