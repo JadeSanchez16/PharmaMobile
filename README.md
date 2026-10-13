@@ -146,8 +146,8 @@ dependencias de plataforma en la presentación compartida:
   modelo de dominio conserva `precio` como `Double` y los composables reciben el
   texto ya formateado.
 - `domain/platform/Compartidor.kt` define el contrato común. La extensión
-  `Producto.comoTextoParaCompartir()` arma una sola vez el mensaje con nombre,
-  precio formateado y stock.
+  `Producto.comoTextoParaCompartir()` arma una sola vez el mensaje con el patrón
+  `Nombre — S/ precio · Stock: cantidad`.
 - `CompartidorAndroid` usa `Intent.ACTION_SEND`, MIME `text/plain`,
   `Intent.EXTRA_TEXT` y un selector con `FLAG_ACTIVITY_NEW_TASK`.
 - `CompartidorIos` usa `UIActivityViewController` y presenta la hoja desde el
@@ -166,6 +166,28 @@ la interfaz Compose con `MainViewControllerKt.MainViewController()`.
 Android se compila y prueba desde Windows. La compilación y ejecución real de
 `iosMain`, el formato monetario iOS y la hoja de compartir permanecen pendientes
 de una máquina macOS con Xcode; no se presentan como evidencias ejecutadas.
+
+### Verificación de la Guía Práctica 09
+
+En Windows, la verificación disponible compila el APK, ejecuta las pruebas del
+target Android y comprueba automáticamente el contrato `expect/actual`, el texto
+compartido, los registros de `Compartidor` en ambos `platformModule` y la ausencia
+de importaciones `android.*` o `platform.UIKit` dentro de `presentation`:
+
+```powershell
+.\gradlew.bat :shared:testAndroidHostTest :androidApp:assembleDebug
+```
+
+Para la verificación manual Android, iniciar PharmaSoft, ejecutar el emulador,
+abrir Inventario y pulsar **Compartir** en un producto real. El selector nativo
+debe mostrar un texto como `Paracetamol 500 mg — S/ 4.50 · Stock: 120`.
+
+La verificación iOS debe realizarse en macOS: iniciar PharmaSoft en el puerto
+8080, abrir `iosApp/iosApp.xcodeproj`, seleccionar un simulador, compilar y pulsar
+**Compartir**. Se deben conservar capturas auténticas del listado con moneda y de
+`UIActivityViewController`. En Windows solo se revisan estáticamente
+`Formato.ios.kt`, `CompartidorIos.kt`, `PlatformModule.ios.kt`, `iOSApp.swift` y
+`ContentView.swift`; esa revisión no sustituye la compilación ni la ejecución.
 
 ## Verificación
 
