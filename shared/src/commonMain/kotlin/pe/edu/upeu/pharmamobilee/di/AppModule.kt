@@ -6,19 +6,39 @@ import org.koin.core.module.Module
 import org.koin.core.module.dsl.viewModel
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
+import pe.edu.upeu.pharmamobilee.data.local.AlmacenSeguro
+import pe.edu.upeu.pharmamobilee.data.remote.AuthApi
+import pe.edu.upeu.pharmamobilee.data.remote.GestorSesionHttp
 import pe.edu.upeu.pharmamobilee.data.remote.ProductoApi
 import pe.edu.upeu.pharmamobilee.data.remote.crearHttpClient
 import pe.edu.upeu.pharmamobilee.data.repository.ProductoRepositorioEnMemoria
 import pe.edu.upeu.pharmamobilee.data.repository.ProductoRepositoryImpl
+import pe.edu.upeu.pharmamobilee.data.repository.AuthRepositorioRest
+import pe.edu.upeu.pharmamobilee.domain.repository.AuthRepository
 import pe.edu.upeu.pharmamobilee.domain.repository.ProductoRepository
 import pe.edu.upeu.pharmamobilee.domain.usecase.ActualizarProductoUseCase
 import pe.edu.upeu.pharmamobilee.domain.usecase.EliminarProductoUseCase
 import pe.edu.upeu.pharmamobilee.domain.usecase.ListarProductosUseCase
 import pe.edu.upeu.pharmamobilee.domain.usecase.RegistrarProductoUseCase
+import pe.edu.upeu.pharmamobilee.domain.usecase.CerrarSesion
+import pe.edu.upeu.pharmamobilee.domain.usecase.IniciarSesion
+import pe.edu.upeu.pharmamobilee.domain.usecase.RecuperarSesion
+import pe.edu.upeu.pharmamobilee.presentation.sesion.SesionViewModel
 import pe.edu.upeu.pharmamobilee.presentation.producto.ProductoViewModel
 
 val dataModule = module {
-    single { crearHttpClient(get(), get(named("urlBase"))) }
+    single { GestorSesionHttp(get<AlmacenSeguro>()) }
+    single {
+        crearHttpClient(
+            engine = get(),
+            urlBase = get(named("urlBase")),
+            almacenSeguro = get(),
+            gestorSesionHttp = get(),
+            esDepuracion = get(named("esDepuracion"))
+        )
+    }
+    single { AuthApi(get()) }
+    single<AuthRepository> { AuthRepositorioRest(get(), get(), get()) }
     single { ProductoApi(get()) }
     single { ProductoRepositorioEnMemoria() }
     single<ProductoRepository> {
@@ -30,6 +50,9 @@ val dataModule = module {
 }
 
 val domainModule = module {
+    factory { IniciarSesion(get()) }
+    factory { CerrarSesion(get()) }
+    factory { RecuperarSesion(get()) }
     factory {
         RegistrarProductoUseCase(get())
     }
@@ -45,6 +68,14 @@ val domainModule = module {
 }
 
 val presentationModule = module {
+    viewModel {
+        SesionViewModel(
+            iniciarSesion = get(),
+            cerrarSesion = get(),
+            recuperarSesion = get(),
+            gestorSesionHttp = get()
+        )
+    }
     viewModel {
         ProductoViewModel(
             listarProductosUseCase = get(),
