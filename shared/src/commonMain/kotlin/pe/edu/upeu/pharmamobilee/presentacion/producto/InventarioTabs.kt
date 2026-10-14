@@ -151,13 +151,15 @@ fun InventarioTabs(
             onEditarProducto = onEditarProducto,
             onCompartirProducto = onCompartirProducto,
             operacion = operacion,
-            onSolicitarEliminar = {
-                if (operacion !is ProductoOperacion.EnCurso) productoAEliminar = it
+            onSolicitarEliminar = onEliminarProducto?.let {
+                { producto ->
+                    if (operacion !is ProductoOperacion.EnCurso) productoAEliminar = producto
+                }
             }
         )
     }
 
-    productoAEliminar?.let { producto ->
+    if (onEliminarProducto != null) productoAEliminar?.let { producto ->
         AlertDialog(
             onDismissRequest = { productoAEliminar = null },
             title = { Text("Eliminar producto") },
@@ -169,7 +171,7 @@ fun InventarioTabs(
                     enabled = !operacion.eliminando(producto.id),
                     onClick = {
                         productoAEliminar = null
-                        onEliminarProducto?.invoke(producto.id)
+                        onEliminarProducto(producto.id)
                     }
                 ) {
                     Text("Eliminar")
@@ -190,7 +192,7 @@ private fun ListaProductos(
     onEditarProducto: ((Producto) -> Unit)?,
     onCompartirProducto: ((Producto) -> Unit)?,
     operacion: ProductoOperacion,
-    onSolicitarEliminar: (ProductoUi) -> Unit
+    onSolicitarEliminar: ((ProductoUi) -> Unit)?
 ) {
     if (productos.isEmpty()) {
         Surface(
@@ -227,7 +229,7 @@ private fun ListaProductos(
                 onEditar = onEditarProducto?.let { { it(productoVisible) } },
                 onCompartir = onCompartirProducto?.let { { it(productoVisible) } },
                 eliminando = operacion.eliminando(producto.id),
-                onEliminar = { onSolicitarEliminar(producto) }
+                onEliminar = onSolicitarEliminar?.let { { it(producto) } }
             )
         }
     }
