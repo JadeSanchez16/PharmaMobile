@@ -119,8 +119,13 @@ La Actividad Autónoma 08 reutiliza las transiciones de
 `ProductoViewModelFlujoTest` en `commonTest` y añade la cancelación al salir.
 `PharmaSoftErroresRealesTest`, en `androidHostTest`, es integración adicional
 contra PharmaSoft y no sustituye el requisito de pruebas comunes. Se activa con
-`$env:PHARMASOFT_PRUEBAS_REALES='true'` antes de Gradle; retirar la variable al
-terminar. Comprueba precio 400, PUT inexistente 404, duplicado 409 y timeout de
+`$env:PHARMASOFT_PRUEBAS_REALES='true'` antes de Gradle. Desde S10 también requiere
+`PHARMASOFT_USUARIO` y `PHARMASOFT_CLAVE` en el entorno del proceso, con una cuenta
+de desarrollo autorizada; nunca se escriben sus valores en el repositorio.
+`PHARMASOFT_PRODUCTO_DUPLICADO_ID` debe identificar un producto temporal cuyo
+nombre empiece por `S08_QA_` o `S10_QA_` (por compatibilidad, el valor por defecto
+es 41). El fixture debe existir antes de la prueba; la suite no elimina datos.
+Retirar las variables al terminar. Comprueba precio 400, PUT inexistente 404, duplicado 409 y timeout de
 1 ms en un cliente aislado, sin cambiar el timeout normal de 15 segundos.
 
 ## Seguridad de red local
@@ -143,8 +148,9 @@ El JWT se conserva cifrado en cada plataforma:
 - Android usa una clave AES de Android Keystore y guarda en
   `SharedPreferences` solamente el texto cifrado y su vector de inicialización.
 - iOS usa Keychain Services (`SecItemAdd`, `SecItemCopyMatching` y
-  `SecItemDelete`). Esta implementación compila desde Windows, pero su ejecución
-  real continúa pendiente de macOS con Xcode.
+  `SecItemDelete`). En Windows se verificó la compilación Kotlin/Native de la
+  biblioteca (`compileKotlinIosSimulatorArm64`), no el enlace ni la ejecución de
+  `iosApp`. El almacenamiento y la aplicación iOS siguen pendientes de macOS/Xcode.
 
 Ktor instala `Auth` con esquema Bearer. `loadTokens` recupera el JWT desde
 `AlmacenSeguro` y `sendWithoutRequest` excluye la ruta pública `/auth/login`.
@@ -155,7 +161,10 @@ nunca imprime el token ni los cuerpos de login.
 Al iniciar la aplicación, un token persistido se valida con
 `GET /api/v1/auth/me`. Un HTTP 401 en una ruta protegida borra la sesión y
 regresa al acceso; un HTTP 403 conserva la sesión y se presenta como falta de
-permiso. Cerrar sesión elimina el JWT local y limpia la caché Bearer.
+permiso. `GestorSesionHttp.sinPermiso` notifica el rechazo de cualquier ruta
+protegida y `App` presenta el diálogo «Acceso no permitido» sin quitar la sesión.
+Descartar el aviso no borra el token; iniciar o invalidar una sesión limpia el
+aviso anterior. Cerrar sesión elimina el JWT local y limpia la caché Bearer.
 
 La interfaz aplica los permisos devueltos por PharmaSoft:
 
@@ -176,6 +185,31 @@ desarrollo autorizada. Las verificaciones automáticas se ejecutan con:
 
 La verificación del flujo real en iOS requiere macOS y Xcode; no se sustituye
 con capturas simuladas.
+
+### Diagnóstico real de HTTP 403 en Android
+
+`Sesion403Instrumentation` pertenece exclusivamente a `androidTest`: se instala
+en un APK de pruebas separado y no añade accesos prohibidos a la interfaz normal.
+Requiere PharmaSoft local y una sesión ALMACENERO iniciada en la app debug.
+Consulta `clientes` con el mismo HttpClient de Koin, verifica HTTP 403 y el aviso
+visible, comprueba que el token no cambió y obtiene HTTP 200 de `auth/me` y
+`productos`. No recibe contraseñas, no modifica permisos ni datos del servidor.
+
+```powershell
+.\gradlew.bat :androidApp:assembleDebug :androidApp:assembleDebugAndroidTest
+adb install -r androidApp/build/outputs/apk/debug/androidApp-debug.apk
+adb install -r androidApp/build/outputs/apk/androidTest/debug/androidApp-debug-androidTest.apk
+# Iniciar sesión como ALMACENERO desde la app antes de continuar.
+adb shell am instrument -w pe.edu.upeu.pharmamobilee.test/pe.edu.upeu.pharmamobilee.Sesion403Instrumentation
+```
+
+El resultado es un escenario instrumentado independiente, no una prueba JUnit
+adicional en el total JVM. La captura se guarda dentro de los datos privados de
+la app debug; no contiene el JWT. El 16/10/2026 este escenario terminó PASS.
+La corrida efectiva de `:shared:testAndroidHostTest --rerun` del mismo día,
+con integración habilitada y fixture temporal, registró 18 suites y 62 pruebas:
+62 aprobadas, 0 fallidas, 0 errores y 0 omitidas. Sin la activación explícita,
+las cuatro pruebas de integración se omiten y no deben contarse como aprobadas.
 
 ## Capacidades nativas
 

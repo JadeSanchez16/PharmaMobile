@@ -24,6 +24,8 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -69,6 +71,8 @@ import pe.edu.upeu.pharmamobilee.presentation.producto.ProductoScreen
 import pe.edu.upeu.pharmamobilee.presentation.producto.ProductoViewModel
 import pe.edu.upeu.pharmamobilee.theme.PharmaMobilTheme
 import org.koin.compose.viewmodel.koinViewModel
+import org.koin.compose.koinInject
+import pe.edu.upeu.pharmamobilee.data.remote.GestorSesionHttp
 
 private enum class TipoNavegacion {
     Compact,
@@ -92,6 +96,8 @@ private val opcionesNavegacion = listOf(
 
 @Composable
 fun App() {
+    val gestorSesionHttp = koinInject<GestorSesionHttp>()
+    val sinPermiso by gestorSesionHttp.sinPermiso.collectAsState()
     val sesionViewModel = koinViewModel<SesionViewModel>()
     val sesionUiState by sesionViewModel.uiState.collectAsState()
     val sesion = sesionUiState.sesion
@@ -110,6 +116,18 @@ fun App() {
     PharmaMobilTheme(
         darkTheme = darkTheme
     ) {
+        if (sesion != null && sinPermiso != null) {
+            AlertDialog(
+                onDismissRequest = gestorSesionHttp::descartarSinPermiso,
+                title = { Text("Acceso no permitido") },
+                text = { Text(sinPermiso!!.message) },
+                confirmButton = {
+                    TextButton(onClick = gestorSesionHttp::descartarSinPermiso) {
+                        Text("Entendido")
+                    }
+                }
+            )
+        }
         when {
             sesionUiState.comprobandoSesion -> {
                 BoxWithConstraints(

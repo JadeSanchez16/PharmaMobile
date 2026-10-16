@@ -124,6 +124,18 @@ class AuthRepositorioRestTest {
                 esDepuracion = false
             )
             runCatching { cliente.get("productos") }
+            if (estado == HttpStatusCode.Forbidden) {
+                assertEquals(ErrorSesion.SinPermiso, gestor.sinPermiso.value)
+                gestor.descartarSinPermiso()
+                assertNull(gestor.sinPermiso.value)
+                assertEquals("token-vigente", almacen.leerToken())
+                gestor.notificarSinPermiso()
+                gestor.tokenActualizado()
+                assertNull(gestor.sinPermiso.value)
+            } else {
+                assertNull(gestor.sinPermiso.value)
+            }
+            cliente.close()
             return almacen.leerToken()
         }
 

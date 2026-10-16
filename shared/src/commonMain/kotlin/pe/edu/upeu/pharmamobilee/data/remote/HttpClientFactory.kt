@@ -86,12 +86,18 @@ fun crearHttpClient(
             if (respuesta.status == HttpStatusCode.Unauthorized && !esLogin) {
                 gestorSesionHttp.invalidarSesion()
             }
+            if (respuesta.status == HttpStatusCode.Forbidden && !esLogin) {
+                gestorSesionHttp.notificarSinPermiso()
+            }
         }
         handleResponseExceptionWithRequest { causa, peticion ->
             val respuesta = (causa as? ClientRequestException)?.response
             val esLogin = peticion.url.encodedPath.endsWith("/auth/login")
             if (respuesta?.status == HttpStatusCode.Unauthorized && !esLogin) {
                 gestorSesionHttp.invalidarSesion()
+            }
+            if (respuesta?.status == HttpStatusCode.Forbidden && !esLogin) {
+                gestorSesionHttp.notificarSinPermiso()
             }
         }
     }

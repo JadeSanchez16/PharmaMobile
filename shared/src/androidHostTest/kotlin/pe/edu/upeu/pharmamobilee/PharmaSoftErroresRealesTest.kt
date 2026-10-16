@@ -7,6 +7,11 @@ import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Test
 import pe.edu.upeu.pharmamobilee.data.remote.ProductoApi
+import pe.edu.upeu.pharmamobilee.data.remote.AuthApi
+import pe.edu.upeu.pharmamobilee.data.remote.GestorSesionHttp
+import pe.edu.upeu.pharmamobilee.data.local.AlmacenSeguroVolatil
+import pe.edu.upeu.pharmamobilee.data.repository.AuthRepositorioRest
+import pe.edu.upeu.pharmamobilee.domain.model.Credenciales
 import pe.edu.upeu.pharmamobilee.data.remote.crearHttpClient
 import pe.edu.upeu.pharmamobilee.data.repository.ProductoRepositoryImpl
 import pe.edu.upeu.pharmamobilee.domain.error.ErrorApi
@@ -18,16 +23,32 @@ import java.time.OffsetDateTime
 
 /** Integración optativa, sin altas ni modificaciones: requiere PharmaSoft local. */
 class PharmaSoftErroresRealesTest {
+    private lateinit var token: String
+
     @Before fun requiereBackendExplicito() {
         assumeTrue("Activar PHARMASOFT_PRUEBAS_REALES=true", System.getenv("PHARMASOFT_PRUEBAS_REALES") == "true")
+        val usuario = requireNotNull(System.getenv("PHARMASOFT_USUARIO"))
+        val clave = requireNotNull(System.getenv("PHARMASOFT_CLAVE"))
+        val almacen = AlmacenSeguroVolatil()
+        val gestor = GestorSesionHttp(almacen)
+        val client = crearHttpClient(OkHttp.create(), "http://localhost:8080/api/v1/", almacenSeguro = almacen, gestorSesionHttp = gestor)
+        try {
+            runBlocking { AuthRepositorioRest(AuthApi(client), almacen, gestor).iniciarSesion(Credenciales(usuario, clave)) }
+            token = checkNotNull(almacen.leerToken())
+        } finally { client.close() }
     }
+
+    private fun clienteAutenticado(timeout: Long = 15_000) = crearHttpClient(
+        OkHttp.create(), "http://localhost:8080/api/v1/", timeout,
+        almacenSeguro = AlmacenSeguroVolatil().apply { guardarToken(token) }
+    )
 
     private fun comprobar(
         escenario: String,
         timeout: Long = 15_000,
         bloque: suspend (ProductoRepositoryImpl) -> Result<*>
     ): ErrorApiException = runBlocking {
-        val client = crearHttpClient(OkHttp.create(), "http://localhost:8080/api/v1/", timeout)
+        val client = clienteAutenticado(timeout)
         try {
             val inicio = OffsetDateTime.now()
             val fallo = assertIs<ErrorApiException>(bloque(ProductoRepositoryImpl(ProductoApi(client), 1L)).exceptionOrNull())
@@ -57,11 +78,14 @@ class PharmaSoftErroresRealesTest {
     }
 
     @Test fun nombreDuplicado409Conflicto() = runBlocking {
-        val client = crearHttpClient(OkHttp.create(), "http://localhost:8080/api/v1/")
-        val existente = try { ProductoApi(client).obtener(41L) } finally { client.close() }
+        val client = clienteAutenticado()
+        val idTemporal = System.getenv("PHARMASOFT_PRODUCTO_DUPLICADO_ID")?.toLong() ?: 41L
+        val existente = try { ProductoApi(client).obtener(idTemporal) } finally { client.close() }
         // Registro temporal de la Guía 08; nunca se elimina un producto preexistente.
-        assumeTrue(existente.nombre.startsWith("S08_QA_"))
-        val error = comprobar("E05 POST nombre duplicado del temporal 41") {
+        check(existente.nombre.startsWith("S08_QA_") || existente.nombre.startsWith("S10_QA_")) {
+            "La prueba requiere un producto temporal identificado; no usar datos ordinarios."
+        }
+        val error = comprobar("E05 POST nombre duplicado del temporal $idTemporal") {
             it.registrar(Producto(0L, existente.nombre, 3.0, 1, categoriaId = 1L))
         }
         assertEquals(409, (error.cause as ClientRequestException).response.status.value)
