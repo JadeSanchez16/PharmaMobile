@@ -25,8 +25,11 @@ import java.io.File
  * No recibe credenciales, no cambia permisos y no modifica datos del servidor.
  */
 class Sesion403Instrumentation : Instrumentation() {
+    private var escenario: String? = null
+
     override fun onCreate(arguments: Bundle?) {
         super.onCreate(arguments)
+        escenario = arguments?.getString("escenario")
         start()
     }
 
@@ -44,6 +47,12 @@ class Sesion403Instrumentation : Instrumentation() {
             val gestor = koin.get<GestorSesionHttp>()
             val auth = koin.get<AuthRepository>()
             val cliente = koin.get<HttpClient>()
+            if (escenario == "logout") {
+                val texto = verificarLogoutReal(almacen, auth, cliente)
+                resultado.putString("stream", "$texto\n")
+                finish(Activity.RESULT_OK, resultado)
+                return
+            }
             val tokenAntes = checkNotNull(almacen.leerToken()) { "Iniciar sesión como ALMACENERO primero" }
             Log.i("S10-PruebaReal", "Almacén seguro: token presente, valor omitido")
             runBlocking {
