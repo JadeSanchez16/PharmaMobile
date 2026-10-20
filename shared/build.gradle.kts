@@ -6,6 +6,15 @@ plugins {
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.kotlinSerialization)
+    alias(libs.plugins.sqldelight)
+}
+
+sqldelight {
+    databases {
+        create("PharmaDb") {
+            packageName.set("pe.edu.upeu.pharmamobilee.db")
+        }
+    }
 }
 
 kotlin {
@@ -49,9 +58,11 @@ kotlin {
                 exclude(group = "com.squareup.okhttp3", module = "okhttp")
             }
             implementation(libs.okhttp)
+            implementation(libs.sqldelight.android)
         }
         iosMain.dependencies {
             implementation(libs.ktor.client.darwin)
+            implementation(libs.sqldelight.native)
         }
         commonMain.dependencies {
             implementation(libs.compose.runtime)
@@ -72,6 +83,8 @@ kotlin {
             implementation(libs.ktor.client.content.negotiation)
             implementation(libs.ktor.client.logging)
             implementation(libs.ktor.serialization.kotlinx.json)
+            implementation(libs.sqldelight.runtime)
+            implementation(libs.sqldelight.coroutines)
             implementation(compose.materialIconsExtended)
         }
         commonTest.dependencies {
@@ -84,4 +97,5 @@ kotlin {
 
 dependencies {
     androidRuntimeClasspath(libs.compose.uiTooling)
+    add("androidHostTestImplementation", libs.sqldelight.jvm)
 }
