@@ -261,6 +261,19 @@ fun ProductCard(
                     else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+            if (producto.origen == OrigenProducto.LOCAL && producto.id < 0) {
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = MaterialTheme.colorScheme.tertiaryContainer
+                ) {
+                    Text(
+                        text = "PENDIENTE DE SINCRONIZAR",
+                        modifier = Modifier.padding(horizontal = 11.dp, vertical = 5.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                    )
+                }
+            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),

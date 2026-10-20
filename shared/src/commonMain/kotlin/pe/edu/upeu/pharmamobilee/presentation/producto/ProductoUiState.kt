@@ -13,7 +13,9 @@ data class ProductoUiState(
     val categoriaEnEdicionId: Long? = null,
     val productos: List<ProductoUi> = emptyList(),
     val fase: ProductoFase = ProductoFase.Cargando,
-    val operacion: ProductoOperacion = ProductoOperacion.Inactiva
+    val operacion: ProductoOperacion = ProductoOperacion.Inactiva,
+    val sincronizando: Boolean = false,
+    val avisoRed: String? = null
 )
 
 sealed interface ProductoFase {

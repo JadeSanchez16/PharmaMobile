@@ -102,6 +102,31 @@ fun ProductoScreen(
                 modifier = Modifier.padding(18.dp)
             )
         }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                uiState.avisoRed?.let { aviso ->
+                    Text(
+                        text = aviso,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+            OutlinedButton(
+                onClick = viewModel::sincronizar,
+                enabled = !uiState.sincronizando
+            ) {
+                if (uiState.sincronizando) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                } else {
+                    Text("Sincronizar")
+                }
+            }
+        }
 
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
             val formulario: @Composable () -> Unit = {

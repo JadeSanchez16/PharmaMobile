@@ -7,12 +7,15 @@ import org.koin.core.module.dsl.viewModel
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
 import pe.edu.upeu.pharmamobilee.data.local.AlmacenSeguro
+import pe.edu.upeu.pharmamobilee.data.local.CreadorDeDriver
+import pe.edu.upeu.pharmamobilee.data.local.FuenteProductosLocal
+import pe.edu.upeu.pharmamobilee.data.local.ProductoLocal
 import pe.edu.upeu.pharmamobilee.data.remote.AuthApi
 import pe.edu.upeu.pharmamobilee.data.remote.GestorSesionHttp
 import pe.edu.upeu.pharmamobilee.data.remote.ProductoApi
 import pe.edu.upeu.pharmamobilee.data.remote.crearHttpClient
 import pe.edu.upeu.pharmamobilee.data.repository.ProductoRepositorioEnMemoria
-import pe.edu.upeu.pharmamobilee.data.repository.ProductoRepositoryImpl
+import pe.edu.upeu.pharmamobilee.data.repository.ProductoRepositorioOffline
 import pe.edu.upeu.pharmamobilee.data.repository.AuthRepositorioRest
 import pe.edu.upeu.pharmamobilee.domain.repository.AuthRepository
 import pe.edu.upeu.pharmamobilee.domain.repository.ProductoRepository
@@ -25,6 +28,7 @@ import pe.edu.upeu.pharmamobilee.domain.usecase.IniciarSesion
 import pe.edu.upeu.pharmamobilee.domain.usecase.RecuperarSesion
 import pe.edu.upeu.pharmamobilee.presentation.sesion.SesionViewModel
 import pe.edu.upeu.pharmamobilee.presentation.producto.ProductoViewModel
+import pe.edu.upeu.pharmamobilee.db.PharmaDb
 
 val dataModule = module {
     single { GestorSesionHttp(get<AlmacenSeguro>()) }
@@ -41,9 +45,12 @@ val dataModule = module {
     single<AuthRepository> { AuthRepositorioRest(get(), get(), get()) }
     single { ProductoApi(get()) }
     single { ProductoRepositorioEnMemoria() }
+    single { PharmaDb(get<CreadorDeDriver>().crear()) }
+    single<FuenteProductosLocal> { ProductoLocal(get()) }
     single<ProductoRepository> {
-        ProductoRepositoryImpl(
-            api = get(),
+        ProductoRepositorioOffline(
+            local = get(),
+            remoto = get(),
             categoriaPorDefecto = 1L
         )
     }
@@ -82,7 +89,8 @@ val presentationModule = module {
             registrarProductoUseCase = get(),
             actualizarProductoUseCase = get(),
             eliminarProductoUseCase = get(),
-            compartidor = get()
+            compartidor = get(),
+            productoRepository = get()
         )
     }
 }

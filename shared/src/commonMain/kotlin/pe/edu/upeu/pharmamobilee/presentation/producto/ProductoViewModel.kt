@@ -13,6 +13,7 @@ import pe.edu.upeu.pharmamobilee.domain.error.ErrorApiException
 import pe.edu.upeu.pharmamobilee.domain.error.mensajeUsuario
 import pe.edu.upeu.pharmamobilee.domain.model.Producto
 import pe.edu.upeu.pharmamobilee.domain.platform.Compartidor
+import pe.edu.upeu.pharmamobilee.domain.repository.ProductoRepository
 import pe.edu.upeu.pharmamobilee.domain.usecase.ActualizarProductoUseCase
 import pe.edu.upeu.pharmamobilee.domain.usecase.comoTextoParaCompartir
 import pe.edu.upeu.pharmamobilee.domain.usecase.EliminarProductoUseCase
@@ -25,16 +26,23 @@ class ProductoViewModel(
     private val registrarProductoUseCase: RegistrarProductoUseCase,
     private val actualizarProductoUseCase: ActualizarProductoUseCase,
     private val eliminarProductoUseCase: EliminarProductoUseCase,
-    private val compartidor: Compartidor
+    private val compartidor: Compartidor,
+    private val productoRepository: ProductoRepository? = null
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ProductoUiState())
     val uiState = _uiState.asStateFlow()
     private var trabajoListado: Job? = null
     private var trabajoOperacion: Job? = null
+    private var trabajoSincronizacion: Job? = null
     private var recargaPendiente = false
 
     init {
-        cargarProductos()
+        if (productoRepository == null) {
+            cargarProductos()
+        } else {
+            observarProductosLocales()
+            sincronizar()
+        }
     }
 
     fun actualizarNombre(nombre: String) {
@@ -95,13 +103,16 @@ class ProductoViewModel(
             }
 
             limpiarFormulario()
-            recargarTrasOperacion(
-                if (editando) {
-                    "Producto \"${producto.nombre}\" actualizado correctamente"
-                } else {
-                    "Producto \"${producto.nombre}\" registrado correctamente"
-                }
-            )
+            val mensaje = if (editando) {
+                "Producto \"${producto.nombre}\" actualizado correctamente"
+            } else if (producto.id < 0) {
+                "Producto guardado localmente. Pendiente de sincronizar."
+            } else {
+                "Producto \"${producto.nombre}\" registrado correctamente"
+            }
+            if (productoRepository == null) recargarTrasOperacion(mensaje) else {
+                _uiState.update { it.copy(operacion = ProductoOperacion.Inactiva, mensajeExito = mensaje) }
+            }
         }
     }
 
@@ -123,7 +134,9 @@ class ProductoViewModel(
             if (_uiState.value.productoEnEdicionId == id) {
                 limpiarFormulario()
             }
-            recargarTrasOperacion("Producto eliminado correctamente")
+            if (productoRepository == null) recargarTrasOperacion("Producto eliminado correctamente") else {
+                _uiState.update { it.copy(operacion = ProductoOperacion.Inactiva, mensajeExito = "Producto eliminado correctamente") }
+            }
         }
     }
 
@@ -156,6 +169,10 @@ class ProductoViewModel(
     }
 
     fun cargarProductos() {
+        if (productoRepository != null) {
+            sincronizar()
+            return
+        }
         trabajoListado?.cancel()
         trabajoListado = viewModelScope.launch {
             cargarListado(mostrarCarga = true)
@@ -163,11 +180,12 @@ class ProductoViewModel(
     }
 
     fun cancelarSolicitudesAlSalir() {
-        if (trabajoListado?.isActive == true || trabajoOperacion?.isActive == true) {
+        if (trabajoListado?.isActive == true || trabajoOperacion?.isActive == true || trabajoSincronizacion?.isActive == true) {
             // El servidor puede haber recibido la mutación: reconciliar al volver.
             recargaPendiente = true
             trabajoListado?.cancel()
             trabajoOperacion?.cancel()
+            trabajoSincronizacion?.cancel()
             _uiState.update { it.copy(operacion = ProductoOperacion.Inactiva) }
         }
     }
@@ -176,6 +194,41 @@ class ProductoViewModel(
         if (recargaPendiente) {
             recargaPendiente = false
             cargarProductos()
+        }
+    }
+
+    /** Acción explícita: la pantalla sigue leyendo de SQLDelight incluso si falla la red. */
+    fun sincronizar() {
+        val repositorio = productoRepository ?: run {
+            cargarProductos()
+            return
+        }
+        if (trabajoSincronizacion?.isActive == true) return
+        trabajoSincronizacion = viewModelScope.launch {
+            _uiState.update { it.copy(sincronizando = true, avisoRed = null) }
+            repositorio.sincronizar().onFailure { error ->
+                _uiState.update {
+                    it.copy(
+                        avisoRed = "Sin conexión: mostrando datos guardados",
+                        operacion = if (it.operacion is ProductoOperacion.EnCurso) it.operacion else ProductoOperacion.Inactiva
+                    )
+                }
+            }
+            _uiState.update { it.copy(sincronizando = false) }
+        }
+    }
+
+    private fun observarProductosLocales() {
+        val repositorio = checkNotNull(productoRepository)
+        trabajoListado = viewModelScope.launch {
+            repositorio.observar().collect { productos ->
+                _uiState.update {
+                    it.copy(
+                        productos = productos.map(Producto::toUi),
+                        fase = if (productos.isEmpty()) ProductoFase.SinProductos else ProductoFase.ConProductos
+                    )
+                }
+            }
         }
     }
 
