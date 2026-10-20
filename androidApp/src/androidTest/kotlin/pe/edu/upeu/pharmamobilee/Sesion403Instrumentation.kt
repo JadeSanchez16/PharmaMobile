@@ -16,6 +16,7 @@ import kotlinx.coroutines.runBlocking
 import org.koin.core.context.GlobalContext
 import pe.edu.upeu.pharmamobilee.data.local.AlmacenSeguro
 import pe.edu.upeu.pharmamobilee.data.remote.GestorSesionHttp
+import pe.edu.upeu.pharmamobilee.domain.model.Credenciales
 import pe.edu.upeu.pharmamobilee.domain.model.ErrorSesion
 import pe.edu.upeu.pharmamobilee.domain.repository.AuthRepository
 import java.io.File
@@ -26,10 +27,14 @@ import java.io.File
  */
 class Sesion403Instrumentation : Instrumentation() {
     private var escenario: String? = null
+    private var usuarioPrueba: String? = null
+    private var clavePrueba: String? = null
 
     override fun onCreate(arguments: Bundle?) {
         super.onCreate(arguments)
         escenario = arguments?.getString("escenario")
+        usuarioPrueba = arguments?.getString("usuario")
+        clavePrueba = arguments?.getString("clave")
         start()
     }
 
@@ -47,6 +52,14 @@ class Sesion403Instrumentation : Instrumentation() {
             val gestor = koin.get<GestorSesionHttp>()
             val auth = koin.get<AuthRepository>()
             val cliente = koin.get<HttpClient>()
+            if (escenario == "e05") {
+                val usuario = checkNotNull(usuarioPrueba) { "Falta usuario de desarrollo" }
+                val clave = checkNotNull(clavePrueba) { "Falta clave de desarrollo" }
+                val texto = verificarPrefijoBearerMinusculaReal(almacen, auth, usuario, clave)
+                resultado.putString("stream", "$texto\n")
+                finish(Activity.RESULT_OK, resultado)
+                return
+            }
             if (escenario == "logout") {
                 val texto = verificarLogoutReal(almacen, auth, cliente)
                 resultado.putString("stream", "$texto\n")
