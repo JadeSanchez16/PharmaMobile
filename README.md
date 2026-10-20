@@ -337,3 +337,40 @@ Las evidencias están documentadas en `docs/evidencias_sesion07/README.md`.
 La preparación de la Actividad Autónoma N.º 07, el catálogo completo, el
 diccionario de DTO y la bitácora pendiente de ejecución están en
 `docs/actividad_autonoma_sesion07/README.md`.
+
+## Persistencia offline-first
+
+La Guía Práctica 11 establece a SQLDelight como fuente de verdad del catálogo
+de productos. `Producto.sq` define la tabla local y sus consultas, mientras que
+`ProductoLocal` es una capa independiente de Ktor y de los DTO; traduce solo
+entre filas SQLDelight y el modelo de dominio. Android crea `pharma.db` con
+`AndroidSqliteDriver` e iOS dispone del driver `NativeSqliteDriver` mediante
+`CreadorDeDriver` y Koin.
+
+`ProductoRepositorioOffline` expone `observar(): Flow<List<Producto>>`. La
+pantalla se suscribe a ese flujo y no vuelve a descargar la lista después de
+crear, editar o eliminar. Al registrar sin conexión se guarda primero un ID
+negativo con `pendiente = 1`, por lo que el producto continúa visible tras
+reiniciar la aplicación. Al sincronizar, se suben los pendientes (`POST`) antes
+de descargar el catálogo remoto paginado (`GET`), y una transacción sustituye el
+ID local por el asignado por PharmaSoft sin borrar pendientes no confirmados.
+
+La comprobación automatizada disponible en Windows incluye tres pruebas comunes
+del repositorio (persistencia sin red, emisión local por `Flow` y orden
+POST→GET) y una prueba SQLite en memoria para el esquema y la reconciliación de
+identificadores:
+
+```powershell
+.\gradlew.bat :shared:testAndroidHostTest --tests "*ProductoRepositorioOfflineTest"
+.\gradlew.bat :shared:testAndroidHostTest --tests "*ProductoLocalSqlDelightTest"
+.\gradlew.bat :shared:testAndroidHostTest :androidApp:assembleDebug
+```
+
+Para verificar manualmente el ciclo offline en el Pixel 9a, sincronizar una vez
+con PharmaSoft activo, cerrar la app, desactivar la red o detener el backend,
+abrir Inventario y registrar un producto temporal. Debe verse el aviso de datos
+guardados y la etiqueta pendiente. Al restaurar la conexión y pulsar
+**Sincronizar**, el producto recibe un ID positivo y puede corroborarse en
+Swagger/Postman. La ejecución y capturas iOS requieren macOS con Xcode; en
+Windows el driver iOS se conserva en el código, pero no se declara como prueba
+ejecutada.

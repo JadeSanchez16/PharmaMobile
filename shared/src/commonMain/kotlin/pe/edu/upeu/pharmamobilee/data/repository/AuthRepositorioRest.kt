@@ -32,15 +32,23 @@ class AuthRepositorioRest(
                     password = credenciales.clave
                 )
             )
+            val sesion = respuesta.aSesion()
             almacen.guardarToken(respuesta.token)
+            almacen.guardarPerfilSesion(sesion)
             gestorSesionHttp.tokenActualizado()
-            respuesta.aSesion()
+            sesion
         }
 
     override suspend fun sesionGuardada(): Sesion? {
         val token = almacen.leerToken() ?: return null
-        return ejecutarAutenticacion(esLogin = false) {
-            api.usuarioActual().aSesion(token)
+        return try {
+            ejecutarAutenticacion(esLogin = false) {
+                api.usuarioActual().aSesion(token).also(almacen::guardarPerfilSesion)
+            }
+        } catch (error: ErrorSesion.SinConexion) {
+            // Sin red no invalida un JWT almacenado ni el catálogo local. La siguiente
+            // operación protegida seguirá validándolo contra PharmaSoft.
+            almacen.leerPerfilSesion()?.copy(token = token) ?: throw error
         }
     }
 

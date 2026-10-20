@@ -9,6 +9,7 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import kotlinx.coroutines.test.runTest
+import kotlinx.io.IOException
 import pe.edu.upeu.pharmamobilee.data.local.AlmacenSeguroVolatil
 import pe.edu.upeu.pharmamobilee.data.remote.AuthApi
 import pe.edu.upeu.pharmamobilee.data.remote.GestorSesionHttp
@@ -84,6 +85,36 @@ class AuthRepositorioRestTest {
 
         assertEquals("admin", sesion?.usuario)
         assertEquals(setOf("ADMIN"), sesion?.roles)
+    }
+
+    @Test
+    fun sesionGuardadaSeRestauraSinRedParaAccederAlCatalogoLocal() = runTest {
+        val almacen = AlmacenSeguroVolatil().apply {
+            guardarToken("token-persistido")
+            guardarPerfilSesion(
+                pe.edu.upeu.pharmamobilee.domain.model.Sesion(
+                    token = "token-persistido",
+                    usuario = "admin",
+                    nombreCompleto = "Administrador",
+                    roles = setOf("ADMIN"),
+                    permisos = setOf("CATALOGO_LEER", "CATALOGO_ESCRIBIR")
+                )
+            )
+        }
+        val gestor = GestorSesionHttp(almacen)
+        val cliente = crearHttpClient(
+            MockEngine { throw IOException("sin red") },
+            "http://localhost/api/v1/",
+            almacenSeguro = almacen,
+            gestorSesionHttp = gestor,
+            esDepuracion = false
+        )
+
+        val sesion = AuthRepositorioRest(AuthApi(cliente), almacen, gestor).sesionGuardada()
+
+        assertEquals("admin", sesion?.usuario)
+        assertTrue(sesion?.puede("CATALOGO_LEER") == true)
+        assertEquals("token-persistido", almacen.leerToken())
     }
 
     @Test

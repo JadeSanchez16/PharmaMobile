@@ -3,6 +3,8 @@ package pe.edu.upeu.pharmamobilee.presentation.producto
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -378,6 +380,10 @@ class ProductoViewModelFlujoTest {
             private set
         var solicitudesEliminacion: Int = 0
             private set
+
+        override fun observar(): Flow<List<Producto>> = flowOf(productosGuardados.toList())
+
+        override suspend fun sincronizar(): Result<Unit> = Result.success(Unit)
 
         override suspend fun registrar(producto: Producto): Result<Producto> = runCatching {
             solicitudesRegistro++

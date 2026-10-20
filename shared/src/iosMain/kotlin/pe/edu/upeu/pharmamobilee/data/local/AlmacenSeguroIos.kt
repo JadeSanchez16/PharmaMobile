@@ -34,12 +34,44 @@ import platform.Security.kSecMatchLimit
 import platform.Security.kSecMatchLimitOne
 import platform.Security.kSecReturnData
 import platform.Security.kSecValueData
+import pe.edu.upeu.pharmamobilee.domain.model.Sesion
 
 @OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
 class AlmacenSeguroIos : AlmacenSeguro {
-    override fun guardarToken(token: String) = memScoped {
-        borrarToken()
-        val bytes = token.encodeToByteArray()
+    override fun guardarToken(token: String) {
+        guardarTexto(token, CUENTA_TOKEN)
+    }
+
+    override fun leerToken(): String? = leerTexto(CUENTA_TOKEN)
+
+    override fun guardarPerfilSesion(sesion: Sesion) {
+        guardarTexto(
+            listOf(
+                sesion.usuario,
+                sesion.nombreCompleto,
+                sesion.roles.sorted().joinToString(","),
+                sesion.permisos.sorted().joinToString(",")
+            ).joinToString(SEPARADOR),
+            CUENTA_PERFIL
+        )
+    }
+
+    override fun leerPerfilSesion(): Sesion? {
+        val token = leerToken() ?: return null
+        val partes = leerTexto(CUENTA_PERFIL)?.split(SEPARADOR, limit = 4) ?: return null
+        if (partes.size != 4) return null
+        return Sesion(
+            token = token,
+            usuario = partes[0],
+            nombreCompleto = partes[1],
+            roles = partes[2].aConjunto(),
+            permisos = partes[3].aConjunto()
+        )
+    }
+
+    private fun guardarTexto(valor: String, cuenta: String) = memScoped {
+        borrarTexto(cuenta)
+        val bytes = valor.encodeToByteArray()
         val datos = bytes.usePinned { fijados ->
             CFDataCreate(
                 allocator = null,
@@ -48,15 +80,15 @@ class AlmacenSeguroIos : AlmacenSeguro {
             )
         } ?: return@memScoped
 
-        conConsultaBase { consulta ->
+        conConsultaBase(cuenta) { consulta ->
             CFDictionarySetValue(consulta, kSecValueData, datos)
             SecItemAdd(consulta, null)
         }
         CFRelease(datos)
     }
 
-    override fun leerToken(): String? = memScoped {
-        conConsultaBase { consulta ->
+    private fun leerTexto(cuenta: String): String? = memScoped {
+        conConsultaBase(cuenta) { consulta ->
             CFDictionarySetValue(consulta, kSecReturnData, kCFBooleanTrue)
             CFDictionarySetValue(consulta, kSecMatchLimit, kSecMatchLimitOne)
             val resultado = alloc<CFTypeRefVar>()
@@ -75,12 +107,21 @@ class AlmacenSeguroIos : AlmacenSeguro {
     }
 
     override fun borrarToken() {
-        conConsultaBase { consulta ->
+        borrarTexto(CUENTA_TOKEN)
+        borrarTexto(CUENTA_PERFIL)
+    }
+
+    private fun borrarTexto(cuenta: String) {
+        conConsultaBase(cuenta) { consulta ->
             SecItemDelete(consulta)
         }
     }
 
+    private fun String.aConjunto(): Set<String> =
+        takeIf(String::isNotBlank)?.split(",")?.toSet().orEmpty()
+
     private fun <T> conConsultaBase(
+        cuentaValor: String,
         bloque: (CFMutableDictionaryRef) -> T
     ): T {
         val consulta = CFDictionaryCreateMutable(null, 0, null, null)
@@ -92,7 +133,7 @@ class AlmacenSeguroIos : AlmacenSeguro {
         ) ?: error("No se pudo crear el identificador de servicio")
         val cuenta = CFStringCreateWithCString(
             null,
-            CUENTA,
+            cuentaValor,
             kCFStringEncodingUTF8
         ) ?: error("No se pudo crear el identificador de cuenta")
         return try {
@@ -109,6 +150,8 @@ class AlmacenSeguroIos : AlmacenSeguro {
 
     private companion object {
         const val SERVICIO = "pe.edu.upeu.pharmamobilee"
-        const val CUENTA = "jwt"
+        const val CUENTA_TOKEN = "jwt"
+        const val CUENTA_PERFIL = "perfil_sesion"
+        const val SEPARADOR = "\u001F"
     }
 }
