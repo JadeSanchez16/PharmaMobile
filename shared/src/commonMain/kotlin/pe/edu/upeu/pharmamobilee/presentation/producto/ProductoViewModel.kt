@@ -211,7 +211,7 @@ class ProductoViewModel(
             }.onFailure { error ->
                 _uiState.update {
                     it.copy(
-                        avisoRed = "Sin conexión: mostrando datos guardados",
+                        avisoRed = mensajeDe(error),
                         avisoSincronizacion = null,
                         operacion = if (it.operacion is ProductoOperacion.EnCurso) it.operacion else ProductoOperacion.Inactiva
                     )

@@ -90,6 +90,32 @@ class ProductoRepositorioOfflineTest {
         assertEquals(501L, local.observar().first().single().id)
     }
 
+    @Test
+    fun sincronizarReconciliaPendienteCuandoElServidorYaCreoElProducto() = runTest {
+        val local = FuenteLocalFalsa(listOf(producto("Producto ya creado", id = -1L, origen = OrigenProducto.LOCAL)))
+        val orden = mutableListOf<HttpMethod>()
+        val api = ProductoApi(
+            crearHttpClient(
+                MockEngine { request ->
+                    orden += request.method
+                    when (request.method) {
+                        HttpMethod.Post -> respond("{\"status\":409,\"message\":\"Producto duplicado\"}", HttpStatusCode.Conflict, jsonHeaders())
+                        HttpMethod.Get -> respond(paginaJson(700L, "Producto ya creado"), HttpStatusCode.OK, jsonHeaders())
+                        else -> error("Solicitud no esperada: ${request.method}")
+                    }
+                },
+                URL_BASE
+            )
+        )
+        val repositorio = ProductoRepositorioOffline(local, api, categoriaPorDefecto = 1L)
+
+        repositorio.sincronizar().getOrThrow()
+
+        assertEquals(listOf(HttpMethod.Post, HttpMethod.Get, HttpMethod.Get), orden)
+        assertTrue(local.pendientes().isEmpty())
+        assertEquals(700L, local.observar().first().single().id)
+    }
+
     private class FuenteLocalFalsa(inicial: List<Producto> = emptyList()) : FuenteProductosLocal {
         private val estado = MutableStateFlow(inicial)
 

@@ -7,6 +7,8 @@ import pe.edu.upeu.pharmamobilee.data.mapper.toDomain
 import pe.edu.upeu.pharmamobilee.data.mapper.toRequest
 import pe.edu.upeu.pharmamobilee.data.remote.ProductoApi
 import pe.edu.upeu.pharmamobilee.data.remote.ejecutarLlamada
+import pe.edu.upeu.pharmamobilee.domain.error.ErrorApi
+import pe.edu.upeu.pharmamobilee.domain.error.ErrorApiException
 import pe.edu.upeu.pharmamobilee.domain.model.Producto
 import pe.edu.upeu.pharmamobilee.domain.model.OrigenProducto
 import pe.edu.upeu.pharmamobilee.domain.repository.ProductoRepository
@@ -70,7 +72,23 @@ class ProductoRepositorioOffline(
             val respuesta = ejecutarLlamada {
                 remoto.crear(pendiente.toRequest(categoriaPorDefecto)).toDomain()
             }
-            val remotoConfirmado = respuesta.getOrElse { return Result.failure(it) }
+            val remotoConfirmado = respuesta.getOrElse { error ->
+                // Si la petición anterior llegó al servidor pero la app se cerró o
+                // perdió la respuesta, el reintento recibe 409. Reconciliamos con
+                // el producto que ya está en PharmaSoft en vez de duplicarlo.
+                val esConflicto = (error as? ErrorApiException)?.error is ErrorApi.Conflicto
+                if (!esConflicto) return Result.failure(error)
+
+                val existente = ejecutarLlamada {
+                    remoto.listarTodas().map { it.toDomain() }
+                }.getOrElse { return Result.failure(error) }
+                    .firstOrNull { remoto ->
+                        remoto.nombre.trim().equals(pendiente.nombre.trim(), ignoreCase = true)
+                    }
+                    ?: return Result.failure(error)
+
+                existente
+            }
             local.confirmarPendiente(pendiente.id, remotoConfirmado)
         }
         return Result.success(Unit)
