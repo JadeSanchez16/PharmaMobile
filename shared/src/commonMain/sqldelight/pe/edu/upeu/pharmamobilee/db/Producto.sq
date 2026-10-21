@@ -10,6 +10,13 @@ CREATE TABLE producto (
     stock_disponible INTEGER NOT NULL DEFAULT 1
 );
 
+-- Una única fila conserva el instante de la última sincronización completa.
+-- Se mantiene junto al catálogo local para que Android e iOS compartan el dato.
+CREATE TABLE estado_sincronizacion (
+    clave INTEGER NOT NULL PRIMARY KEY CHECK (clave = 1),
+    ultima_correcta_millis INTEGER
+);
+
 listarTodos:
 SELECT id, nombre, precio, stock, pendiente, activo,
        categoria_id AS categoriaId,
@@ -37,3 +44,12 @@ SELECT COALESCE(MIN(id), 0) FROM producto;
 
 borrarPorId:
 DELETE FROM producto WHERE id = ?;
+
+guardarUltimaSincronizacion:
+INSERT OR REPLACE INTO estado_sincronizacion(clave, ultima_correcta_millis)
+VALUES (1, ?);
+
+obtenerUltimaSincronizacion:
+SELECT ultima_correcta_millis
+FROM estado_sincronizacion
+WHERE clave = 1;

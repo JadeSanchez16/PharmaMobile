@@ -12,6 +12,7 @@ import pe.edu.upeu.pharmamobilee.domain.error.ErrorApiException
 import pe.edu.upeu.pharmamobilee.domain.model.Producto
 import pe.edu.upeu.pharmamobilee.domain.model.OrigenProducto
 import pe.edu.upeu.pharmamobilee.domain.repository.ProductoRepository
+import kotlin.time.Clock
 
 /**
  * Repositorio offline-first: SQLDelight es la fuente de verdad y PharmaSoft
@@ -64,8 +65,13 @@ class ProductoRepositorioOffline(
         subirPendientes().getOrElse { return Result.failure(it) }
         return ejecutarLlamada {
             remoto.listarTodas().map { it.toDomain() }
-        }.map { productos -> local.reemplazarSincronizados(productos) }
+        }.map { productos ->
+            local.reemplazarSincronizados(productos)
+            local.guardarUltimaSincronizacion(Clock.System.now().toEpochMilliseconds())
+        }
     }
+
+    override fun ultimaSincronizacion(): Long? = local.ultimaSincronizacion()
 
     private suspend fun subirPendientes(): Result<Unit> {
         local.pendientes().forEach { pendiente ->

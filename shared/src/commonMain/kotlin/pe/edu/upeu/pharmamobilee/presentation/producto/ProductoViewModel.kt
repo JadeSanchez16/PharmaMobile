@@ -207,7 +207,12 @@ class ProductoViewModel(
         trabajoSincronizacion = viewModelScope.launch {
             _uiState.update { it.copy(sincronizando = true, avisoRed = null, avisoSincronizacion = null) }
             repositorio.sincronizar().onSuccess {
-                _uiState.update { it.copy(avisoSincronizacion = "Catálogo sincronizado correctamente") }
+                _uiState.update {
+                    it.copy(
+                        avisoSincronizacion = "Catálogo sincronizado correctamente",
+                        ultimaSincronizacionMillis = repositorio.ultimaSincronizacion()
+                    )
+                }
             }.onFailure { error ->
                 _uiState.update {
                     it.copy(
@@ -228,7 +233,8 @@ class ProductoViewModel(
                 _uiState.update {
                     it.copy(
                         productos = productos.map(Producto::toUi),
-                        fase = if (productos.isEmpty()) ProductoFase.SinProductos else ProductoFase.ConProductos
+                        fase = if (productos.isEmpty()) ProductoFase.SinProductos else ProductoFase.ConProductos,
+                        ultimaSincronizacionMillis = repositorio.ultimaSincronizacion()
                     )
                 }
             }

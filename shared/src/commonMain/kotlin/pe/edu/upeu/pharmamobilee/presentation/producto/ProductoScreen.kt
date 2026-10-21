@@ -47,6 +47,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import kotlin.time.Clock
 import pe.edu.upeu.pharmamobilee.domain.model.Producto
 import pe.edu.upeu.pharmamobilee.presentacion.components.EmptyState
 import pe.edu.upeu.pharmamobilee.presentacion.components.ErrorState
@@ -108,6 +109,11 @@ fun ProductoScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = textoUltimaSincronizacion(uiState.ultimaSincronizacionMillis),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 uiState.avisoRed?.let { aviso ->
                     Text(
                         text = aviso,
@@ -181,6 +187,27 @@ fun ProductoScreen(
           hostState = snackbarHostState,
           modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp)
       )
+    }
+}
+
+internal fun textoUltimaSincronizacion(
+    ultimaSincronizacionMillis: Long?,
+    ahoraMillis: Long = Clock.System.now().toEpochMilliseconds()
+): String {
+    if (ultimaSincronizacionMillis == null) return "Aún no se ha sincronizado el catálogo"
+    val diferencia = (ahoraMillis - ultimaSincronizacionMillis).coerceAtLeast(0L)
+    val minutos = diferencia / 60_000L
+    return when {
+        minutos < 1L -> "Actualizado hace menos de un minuto"
+        minutos < 60L -> "Actualizado hace $minutos ${if (minutos == 1L) "minuto" else "minutos"}"
+        minutos < 1_440L -> {
+            val horas = minutos / 60L
+            "Actualizado hace $horas ${if (horas == 1L) "hora" else "horas"}"
+        }
+        else -> {
+            val dias = minutos / 1_440L
+            "Actualizado hace $dias ${if (dias == 1L) "día" else "días"}"
+        }
     }
 }
 

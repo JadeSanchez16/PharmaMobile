@@ -13,4 +13,7 @@ interface ProductoRepository {
     suspend fun registrar(producto: Producto): Result<Producto>
     suspend fun actualizar(producto: Producto): Result<Producto>
     suspend fun eliminar(id: Long): Result<Unit>
+
+    /** Instante local de la última sincronización completa, si existe. */
+    fun ultimaSincronizacion(): Long? = null
 }

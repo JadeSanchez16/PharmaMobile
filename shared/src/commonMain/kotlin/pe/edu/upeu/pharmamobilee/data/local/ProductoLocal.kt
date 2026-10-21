@@ -17,6 +17,8 @@ interface FuenteProductosLocal {
     fun confirmarPendiente(idLocal: Long, productoServidor: Producto)
     fun eliminar(id: Long)
     fun reemplazarSincronizados(productos: List<Producto>)
+    fun guardarUltimaSincronizacion(millis: Long)
+    fun ultimaSincronizacion(): Long?
 }
 
 /**
@@ -62,6 +64,13 @@ class ProductoLocal(base: PharmaDb) : FuenteProductosLocal {
             productos.forEach { insertar(it.copy(origen = OrigenProducto.REMOTO), pendiente = 0L) }
         }
     }
+
+    override fun guardarUltimaSincronizacion(millis: Long) {
+        consultas.guardarUltimaSincronizacion(millis)
+    }
+
+    override fun ultimaSincronizacion(): Long? =
+        consultas.obtenerUltimaSincronizacion().executeAsOneOrNull()?.ultima_correcta_millis
 
     private fun insertar(producto: Producto, pendiente: Long) {
         consultas.insertar(

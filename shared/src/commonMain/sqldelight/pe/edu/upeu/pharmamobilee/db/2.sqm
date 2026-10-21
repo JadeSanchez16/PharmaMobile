@@ -1,0 +1,4 @@
+CREATE TABLE estado_sincronizacion (
+    clave INTEGER NOT NULL PRIMARY KEY CHECK (clave = 1),
+    ultima_correcta_millis INTEGER
+);

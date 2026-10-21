@@ -118,6 +118,7 @@ class ProductoRepositorioOfflineTest {
 
     private class FuenteLocalFalsa(inicial: List<Producto> = emptyList()) : FuenteProductosLocal {
         private val estado = MutableStateFlow(inicial)
+        private var ultimaSincronizacion: Long? = null
 
         override fun observar(): Flow<List<Producto>> = estado
 
@@ -146,6 +147,12 @@ class ProductoRepositorioOfflineTest {
             val pendientes = estado.value.filter { it.origen == OrigenProducto.LOCAL }
             estado.value = pendientes + productos.map { it.copy(origen = OrigenProducto.REMOTO) }
         }
+
+        override fun guardarUltimaSincronizacion(millis: Long) {
+            ultimaSincronizacion = millis
+        }
+
+        override fun ultimaSincronizacion(): Long? = ultimaSincronizacion
 
         private fun reemplazar(producto: Producto) {
             estado.value = estado.value.filterNot { it.id == producto.id } + producto
