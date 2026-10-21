@@ -15,7 +15,8 @@ data class ProductoUiState(
     val fase: ProductoFase = ProductoFase.Cargando,
     val operacion: ProductoOperacion = ProductoOperacion.Inactiva,
     val sincronizando: Boolean = false,
-    val avisoRed: String? = null
+    val avisoRed: String? = null,
+    val avisoSincronizacion: String? = null
 )
 
 sealed interface ProductoFase {

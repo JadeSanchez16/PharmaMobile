@@ -115,6 +115,13 @@ fun ProductoScreen(
                         color = MaterialTheme.colorScheme.error
                     )
                 }
+                uiState.avisoSincronizacion?.let { aviso ->
+                    Text(
+                        text = aviso,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
             OutlinedButton(
                 onClick = viewModel::sincronizar,

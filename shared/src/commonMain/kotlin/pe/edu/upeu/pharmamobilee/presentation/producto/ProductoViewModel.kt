@@ -205,11 +205,14 @@ class ProductoViewModel(
         }
         if (trabajoSincronizacion?.isActive == true) return
         trabajoSincronizacion = viewModelScope.launch {
-            _uiState.update { it.copy(sincronizando = true, avisoRed = null) }
-            repositorio.sincronizar().onFailure { error ->
+            _uiState.update { it.copy(sincronizando = true, avisoRed = null, avisoSincronizacion = null) }
+            repositorio.sincronizar().onSuccess {
+                _uiState.update { it.copy(avisoSincronizacion = "Catálogo sincronizado correctamente") }
+            }.onFailure { error ->
                 _uiState.update {
                     it.copy(
                         avisoRed = "Sin conexión: mostrando datos guardados",
+                        avisoSincronizacion = null,
                         operacion = if (it.operacion is ProductoOperacion.EnCurso) it.operacion else ProductoOperacion.Inactiva
                     )
                 }
