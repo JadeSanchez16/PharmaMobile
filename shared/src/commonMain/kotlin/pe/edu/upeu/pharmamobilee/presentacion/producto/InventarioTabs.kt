@@ -164,7 +164,13 @@ fun InventarioTabs(
             onDismissRequest = { productoAEliminar = null },
             title = { Text("Eliminar producto") },
             text = {
-                Text("¿Deseas eliminar ${producto.nombre}? Esta acción dará de baja el producto en PharmaSoft.")
+                Text(
+                    if (producto.id < 0) {
+                        "¿Deseas eliminar ${producto.nombre}? Se quitará el registro pendiente de este dispositivo."
+                    } else {
+                        "¿Deseas eliminar ${producto.nombre}? Esta acción dará de baja el producto en PharmaSoft."
+                    }
+                )
             },
             confirmButton = {
                 TextButton(

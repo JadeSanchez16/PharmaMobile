@@ -52,6 +52,18 @@ class ProductoRepositorioOfflineTest {
     }
 
     @Test
+    fun eliminarPendienteLoQuitaSoloDeLaBaseLocal() = runTest {
+        val pendiente = producto("Pendiente local", id = -1L, origen = OrigenProducto.LOCAL)
+        val local = FuenteLocalFalsa(listOf(pendiente))
+        val api = ProductoApi(crearHttpClient(MockEngine { error("No debe llamar a red") }, URL_BASE))
+        val repositorio = ProductoRepositorioOffline(local, api, categoriaPorDefecto = 1L)
+
+        repositorio.eliminar(pendiente.id).getOrThrow()
+
+        assertTrue(local.observar().first().isEmpty())
+    }
+
+    @Test
     fun sincronizarPublicaPendientesAntesDeDescargarCatalogoRemoto() = runTest {
         val local = FuenteLocalFalsa(listOf(producto("Pendiente", id = -1L, origen = OrigenProducto.LOCAL)))
         val orden = mutableListOf<HttpMethod>()

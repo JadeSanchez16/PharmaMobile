@@ -45,9 +45,18 @@ class ProductoRepositorioOffline(
         remoto.actualizar(producto.id, producto.toRequest(categoriaPorDefecto)).toDomain()
     }.onSuccess(local::guardarSincronizado)
 
-    override suspend fun eliminar(id: Long): Result<Unit> = ejecutarLlamada {
-        remoto.eliminar(id)
-    }.onSuccess { local.eliminar(id) }
+    override suspend fun eliminar(id: Long): Result<Unit> {
+        // Un producto creado sin red aún no existe en PharmaSoft. Eliminarlo
+        // debe retirar solamente su fila pendiente de la fuente local.
+        if (id < 0) {
+            local.eliminar(id)
+            return Result.success(Unit)
+        }
+
+        return ejecutarLlamada {
+            remoto.eliminar(id)
+        }.onSuccess { local.eliminar(id) }
+    }
 
     override suspend fun sincronizar(): Result<Unit> {
         subirPendientes().getOrElse { return Result.failure(it) }
