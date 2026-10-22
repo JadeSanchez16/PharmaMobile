@@ -15,9 +15,12 @@ import io.ktor.client.request.get
 import kotlinx.coroutines.runBlocking
 import org.koin.core.context.GlobalContext
 import pe.edu.upeu.pharmamobilee.data.local.AlmacenSeguro
+import pe.edu.upeu.pharmamobilee.data.local.FuenteProductosLocal
 import pe.edu.upeu.pharmamobilee.data.remote.GestorSesionHttp
 import pe.edu.upeu.pharmamobilee.domain.model.Credenciales
 import pe.edu.upeu.pharmamobilee.domain.model.ErrorSesion
+import pe.edu.upeu.pharmamobilee.domain.model.Sesion
+import pe.edu.upeu.pharmamobilee.domain.model.Producto
 import pe.edu.upeu.pharmamobilee.domain.repository.AuthRepository
 import java.io.File
 
@@ -52,6 +55,42 @@ class Sesion403Instrumentation : Instrumentation() {
             val gestor = koin.get<GestorSesionHttp>()
             val auth = koin.get<AuthRepository>()
             val cliente = koin.get<HttpClient>()
+            if (escenario == "aa11-e05-preparar") {
+                // Se ejecuta con el Pixel en modo avión. El valor no es un JWT real y
+                // nunca se registra: sirve para demostrar que el perfil local permite
+                // abrir el catálogo mientras no haya red. Al reconectar, PharmaSoft
+                // lo rechaza y el flujo 401 existente limpia la sesión.
+                almacen.guardarToken("token-invalido-controlado-aa11")
+                almacen.guardarPerfilSesion(
+                    Sesion(
+                        token = "token-invalido-controlado-aa11",
+                        usuario = "AA11_OFFLINE",
+                        nombreCompleto = "Escenario offline controlado",
+                        roles = setOf("ADMIN"),
+                        permisos = setOf("CATALOGO_ESCRIBIR")
+                    )
+                )
+                val local = koin.get<FuenteProductosLocal>()
+                local.guardarSincronizado(
+                    Producto(
+                        id = 11_021,
+                        nombre = "AA11_CATÁLOGO_LOCAL",
+                        precio = 1.50,
+                        stock = 16,
+                        categoria = "Analgésicos",
+                        categoriaId = 1L
+                    )
+                )
+                val activity = startActivitySync(
+                    Intent(targetContext, MainActivity::class.java)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+                runOnMainSync { activity.recreate() }
+                Log.i("AA11-E05", "Perfil local preparado; token omitido del registro")
+                resultado.putString("stream", "PASS: perfil local preparado para E05; token omitido.\n")
+                finish(Activity.RESULT_OK, resultado)
+                return
+            }
             if (escenario == "e05") {
                 val usuario = checkNotNull(usuarioPrueba) { "Falta usuario de desarrollo" }
                 val clave = checkNotNull(clavePrueba) { "Falta clave de desarrollo" }
