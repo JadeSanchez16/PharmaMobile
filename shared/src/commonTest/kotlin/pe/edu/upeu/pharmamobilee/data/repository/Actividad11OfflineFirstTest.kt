@@ -8,12 +8,10 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.io.IOException
-import pe.edu.upeu.pharmamobilee.data.local.FuenteProductosLocal
+import pe.edu.upeu.pharmamobilee.data.local.ProductoLocal
 import pe.edu.upeu.pharmamobilee.data.mapper.toDomain
 import pe.edu.upeu.pharmamobilee.data.remote.ProductoApi
 import pe.edu.upeu.pharmamobilee.data.remote.crearHttpClient
@@ -25,14 +23,15 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * Suite solicitada por la Actividad Autónoma 11. Cada caso crea su propio
- * almacén en memoria y usa MockEngine; por eso no requiere emulador, red ni espera.
+ * Suite solicitada por la Actividad Autónoma 11. Cada caso crea su propia
+ * base SQLDelight en memoria y usa MockEngine; por eso no requiere emulador,
+ * red ni espera.
  */
 class Actividad11OfflineFirstTest {
 
     @Test
     fun sincronizacionConRedGuardaCatalogoYElFlowEmiteListaCompleta() = runTest {
-        val local = FuenteEnMemoria()
+        val local = ProductoLocal(baseEnMemoria())
         val api = api { request ->
             assertEquals(HttpMethod.Get, request.method)
             respond(paginaJson(productoJson(11, "Remoto A"), productoJson(12, "Remoto B")), HttpStatusCode.OK, jsonHeaders())
@@ -48,7 +47,7 @@ class Actividad11OfflineFirstTest {
 
     @Test
     fun registroSinRedGuardaPendienteYElFlowLoEmite() = runTest {
-        val local = FuenteEnMemoria()
+        val local = ProductoLocal(baseEnMemoria())
         val api = api { throw IOException("Sin conexión controlada") }
 
         val creado = ProductoRepositorioOffline(local, api, 1L).registrar(producto("Sin red")).getOrThrow()
@@ -60,7 +59,8 @@ class Actividad11OfflineFirstTest {
 
     @Test
     fun envioAlReconectarConfirmaLaFilaPendiente() = runTest {
-        val local = FuenteEnMemoria(listOf(producto("Pendiente", -1, OrigenProducto.LOCAL)))
+        val local = ProductoLocal(baseEnMemoria())
+        local.guardarPendiente(producto("Pendiente"))
         val api = api { request ->
             when (request.method) {
                 HttpMethod.Post -> respond(productoJson(501, "Pendiente"), HttpStatusCode.Created, jsonHeaders())
@@ -77,7 +77,8 @@ class Actividad11OfflineFirstTest {
 
     @Test
     fun bajadaDelServidorNoBorraLoPendiente() = runTest {
-        val local = FuenteEnMemoria(listOf(producto("Creado sin conexión", -1, OrigenProducto.LOCAL)))
+        val local = ProductoLocal(baseEnMemoria())
+        val creadoSinConexion = local.guardarPendiente(producto("Creado sin conexión"))
         val api = api { request ->
             assertEquals(HttpMethod.Get, request.method)
             respond(paginaJson(productoJson(800, "Remoto")), HttpStatusCode.OK, jsonHeaders())
@@ -87,13 +88,14 @@ class Actividad11OfflineFirstTest {
         local.reemplazarSincronizados(descargados)
 
         val catalogo = local.observar().first()
-        assertEquals(setOf(-1L, 800L), catalogo.map(Producto::id).toSet())
+        assertEquals(setOf(creadoSinConexion.id, 800L), catalogo.map(Producto::id).toSet())
         assertEquals("Creado sin conexión", local.pendientes().single().nombre)
     }
 
     @Test
     fun identificadoresLocalesYRemotosNoColisionan() = runTest {
-        val local = FuenteEnMemoria(listOf(producto("Local", -1, OrigenProducto.LOCAL)))
+        val local = ProductoLocal(baseEnMemoria())
+        local.guardarPendiente(producto("Local"))
         val api = api { request ->
             when (request.method) {
                 HttpMethod.Post -> respond(productoJson(701, "Local"), HttpStatusCode.Created, jsonHeaders())
@@ -114,7 +116,7 @@ class Actividad11OfflineFirstTest {
 
     @Test
     fun sincronizarDosVecesNoDuplicaFilas() = runTest {
-        val local = FuenteEnMemoria()
+        val local = ProductoLocal(baseEnMemoria())
         val api = api { request ->
             assertEquals(HttpMethod.Get, request.method)
             respond(paginaJson(productoJson(90, "Único remoto")), HttpStatusCode.OK, jsonHeaders())
@@ -127,39 +129,6 @@ class Actividad11OfflineFirstTest {
         val catalogo = local.observar().first()
         assertEquals(1, catalogo.size)
         assertEquals(90L, catalogo.single().id)
-    }
-
-    private class FuenteEnMemoria(inicial: List<Producto> = emptyList()) : FuenteProductosLocal {
-        private val estado = MutableStateFlow(inicial)
-        private var ultima: Long? = null
-
-        override fun observar(): Flow<List<Producto>> = estado
-        override fun pendientes(): List<Producto> = estado.value.filter { it.origen == OrigenProducto.LOCAL }
-
-        override fun guardarPendiente(producto: Producto): Producto {
-            val id = (estado.value.minOfOrNull { it.id } ?: 0L).coerceAtMost(0L) - 1L
-            return producto.copy(id = id, origen = OrigenProducto.LOCAL).also { estado.value += it }
-        }
-
-        override fun guardarSincronizado(producto: Producto) = reemplazar(producto.copy(origen = OrigenProducto.REMOTO))
-
-        override fun confirmarPendiente(idLocal: Long, productoServidor: Producto) {
-            estado.value = estado.value.filterNot { it.id == idLocal } + productoServidor.copy(origen = OrigenProducto.REMOTO)
-        }
-
-        override fun eliminar(id: Long) { estado.value = estado.value.filterNot { it.id == id } }
-
-        override fun reemplazarSincronizados(productos: List<Producto>) {
-            val pendientes = estado.value.filter { it.origen == OrigenProducto.LOCAL }
-            estado.value = pendientes + productos.map { it.copy(origen = OrigenProducto.REMOTO) }
-        }
-
-        override fun guardarUltimaSincronizacion(millis: Long) { ultima = millis }
-        override fun ultimaSincronizacion(): Long? = ultima
-
-        private fun reemplazar(producto: Producto) {
-            estado.value = estado.value.filterNot { it.id == producto.id } + producto
-        }
     }
 
     private fun api(responder: MockRequestHandler): ProductoApi =
