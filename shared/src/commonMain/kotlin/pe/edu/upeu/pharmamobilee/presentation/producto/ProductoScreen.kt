@@ -124,7 +124,7 @@ fun ProductoScreen(
                 }
                 if (uiState.fallidasSincronizacion > 0) {
                     Text(
-                        text = "${uiState.fallidasSincronizacion} cambios requieren revisión",
+                        text = "${uiState.fallidasSincronizacion} cambios requieren revisión. Corrige sus datos y pulsa Sincronizar.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error
                     )
