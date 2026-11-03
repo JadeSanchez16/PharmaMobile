@@ -2,6 +2,7 @@ package pe.edu.upeu.pharmamobilee.data.repository
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.delay
 import pe.edu.upeu.pharmamobilee.data.local.FuenteProductosLocal
 import pe.edu.upeu.pharmamobilee.data.mapper.toDomain
 import pe.edu.upeu.pharmamobilee.data.mapper.toRequest
@@ -9,8 +10,10 @@ import pe.edu.upeu.pharmamobilee.data.remote.ProductoApi
 import pe.edu.upeu.pharmamobilee.data.remote.ejecutarLlamada
 import pe.edu.upeu.pharmamobilee.domain.error.ErrorApi
 import pe.edu.upeu.pharmamobilee.domain.error.ErrorApiException
+import pe.edu.upeu.pharmamobilee.domain.error.mensajeUsuario
 import pe.edu.upeu.pharmamobilee.domain.model.Producto
 import pe.edu.upeu.pharmamobilee.domain.model.OrigenProducto
+import pe.edu.upeu.pharmamobilee.domain.model.ResultadoEnvio
 import pe.edu.upeu.pharmamobilee.domain.repository.ProductoRepository
 import kotlin.time.Clock
 
@@ -23,6 +26,14 @@ class ProductoRepositorioOffline(
     private val remoto: ProductoApi,
     private val categoriaPorDefecto: Long
 ) : ProductoRepository {
+
+    companion object {
+        const val MAX_INTENTOS = 5
+
+        /** 1 s, 2 s, 4 s, 8 s y 16 s; se limita para no crecer sin control. */
+        fun esperaCreciente(intentosPrevios: Int): Long =
+            1_000L shl intentosPrevios.coerceIn(0, 4)
+    }
 
     override fun observar(): Flow<List<Producto>> = local.observar()
 
@@ -40,7 +51,9 @@ class ProductoRepositorioOffline(
         return if (sincronizacion.isSuccess) {
             Result.success(producto.copy(origen = OrigenProducto.REMOTO))
         } else {
-            Result.success(guardado)
+            // La sincronización puede haber registrado el primer fallo y
+            // actualizado intentos/ultimoError. Se devuelve la fila vigente.
+            Result.success(local.pendientes().firstOrNull { it.id == guardado.id } ?: guardado)
         }
     }
 
@@ -73,31 +86,69 @@ class ProductoRepositorioOffline(
 
     override fun ultimaSincronizacion(): Long? = local.ultimaSincronizacion()
 
-    private suspend fun subirPendientes(): Result<Unit> {
-        local.pendientes().forEach { pendiente ->
-            val respuesta = ejecutarLlamada {
-                remoto.crear(pendiente.toRequest(categoriaPorDefecto)).toDomain()
-            }
-            val remotoConfirmado = respuesta.getOrElse { error ->
-                // Si la petición anterior llegó al servidor pero la app se cerró o
-                // perdió la respuesta, el reintento recibe 409. Reconciliamos con
-                // el producto que ya está en PharmaSoft en vez de duplicarlo.
-                val esConflicto = (error as? ErrorApiException)?.error is ErrorApi.Conflicto
-                if (!esConflicto) return Result.failure(error)
+    private suspend fun subirPendientes(): Result<Unit> = runCatching {
+        local.pendientesPorEnviar(MAX_INTENTOS).forEach { pendiente ->
+            when (val resultado = enviarPendiente(pendiente)) {
+                is ResultadoEnvio.Exito -> {
+                    local.confirmarPendiente(
+                        pendiente.id,
+                        pendiente.copy(
+                            id = resultado.idServidor,
+                            origen = OrigenProducto.REMOTO,
+                            intentos = 0,
+                            ultimoError = null
+                        )
+                    )
+                }
 
-                val existente = ejecutarLlamada {
-                    remoto.listarTodas().map { it.toDomain() }
-                }.getOrElse { return Result.failure(error) }
-                    .firstOrNull { remoto ->
-                        remoto.nombre.trim().equals(pendiente.nombre.trim(), ignoreCase = true)
-                    }
-                    ?: return Result.failure(error)
+                is ResultadoEnvio.Permanente ->
+                    local.marcarFallida(pendiente.id, resultado.motivo, MAX_INTENTOS)
 
-                existente
+                is ResultadoEnvio.Transitorio -> {
+                    // Crear no es idempotente: no se repite automáticamente dentro
+                    // de esta misma sincronización. La espera limita la cola y el
+                    // siguiente intento se produce solo con una acción explícita.
+                    delay(esperaCreciente(pendiente.intentos))
+                    local.sumarIntento(pendiente.id, resultado.motivo)
+                }
             }
-            local.confirmarPendiente(pendiente.id, remotoConfirmado)
         }
-        return Result.success(Unit)
     }
+
+    private suspend fun enviarPendiente(pendiente: Producto): ResultadoEnvio {
+        val respuesta = ejecutarLlamada {
+            remoto.crear(pendiente.toRequest(categoriaPorDefecto)).toDomain()
+        }
+        respuesta.onSuccess { return ResultadoEnvio.Exito(it.id) }
+
+        val error = checkNotNull(respuesta.exceptionOrNull())
+        // Si el servidor informa conflicto, se consulta una vez el catálogo para
+        // reconciliar un POST cuyo resultado se perdió, sin crear un duplicado.
+        if ((error as? ErrorApiException)?.error is ErrorApi.Conflicto) {
+            val existente = ejecutarLlamada {
+                remoto.listarTodas().map { it.toDomain() }
+            }.getOrNull()?.firstOrNull { remoto ->
+                remoto.nombre.trim().equals(pendiente.nombre.trim(), ignoreCase = true)
+            }
+            if (existente != null) return ResultadoEnvio.Exito(existente.id)
+        }
+        return error.aResultadoEnvio()
+    }
+}
+
+private fun Throwable.aResultadoEnvio(): ResultadoEnvio = when (
+    val api = (this as? ErrorApiException)?.error
+) {
+    ErrorApi.SinConexion,
+    ErrorApi.TiempoAgotado,
+    ErrorApi.Servidor -> ResultadoEnvio.Transitorio(api.mensajeUsuario())
+
+    is ErrorApi.Validacion,
+    ErrorApi.NoEncontrado,
+    is ErrorApi.Conflicto,
+    ErrorApi.SinPermiso,
+    ErrorApi.SesionExpirada -> ResultadoEnvio.Permanente(api.mensajeUsuario())
+
+    null -> ResultadoEnvio.Transitorio("No se pudo completar el envío. Inténtalo nuevamente.")
 }
 
