@@ -17,7 +17,9 @@ data class ProductoUiState(
     val sincronizando: Boolean = false,
     val avisoRed: String? = null,
     val avisoSincronizacion: String? = null,
-    val ultimaSincronizacionMillis: Long? = null
+    val ultimaSincronizacionMillis: Long? = null,
+    val pendientesSincronizacion: Int = 0,
+    val fallidasSincronizacion: Int = 0
 )
 
 sealed interface ProductoFase {

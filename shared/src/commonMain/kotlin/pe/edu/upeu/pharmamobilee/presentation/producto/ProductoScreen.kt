@@ -114,6 +114,20 @@ fun ProductoScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                if (uiState.pendientesSincronizacion > 0) {
+                    Text(
+                        text = "${uiState.pendientesSincronizacion} cambios por enviar",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.tertiary
+                    )
+                }
+                if (uiState.fallidasSincronizacion > 0) {
+                    Text(
+                        text = "${uiState.fallidasSincronizacion} cambios requieren revisión",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
                 uiState.avisoRed?.let { aviso ->
                     Text(
                         text = aviso,

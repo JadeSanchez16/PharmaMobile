@@ -1,6 +1,7 @@
 package pe.edu.upeu.pharmamobilee.domain.repository
 
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import pe.edu.upeu.pharmamobilee.domain.model.Producto
 
 interface ProductoRepository {
@@ -16,4 +17,8 @@ interface ProductoRepository {
 
     /** Instante local de la última sincronización completa, si existe. */
     fun ultimaSincronizacion(): Long? = null
+
+    /** Contadores observables del estado offline-first. */
+    fun observarPendientes(): Flow<Int> = flowOf(0)
+    fun observarFallidas(): Flow<Int> = flowOf(0)
 }

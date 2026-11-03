@@ -2,6 +2,7 @@ package pe.edu.upeu.pharmamobilee.data.repository
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.delay
 import pe.edu.upeu.pharmamobilee.data.local.FuenteProductosLocal
 import pe.edu.upeu.pharmamobilee.data.mapper.toDomain
@@ -85,6 +86,12 @@ class ProductoRepositorioOffline(
     }
 
     override fun ultimaSincronizacion(): Long? = local.ultimaSincronizacion()
+
+    override fun observarPendientes(): Flow<Int> =
+        local.observarPendientes(MAX_INTENTOS).map(Long::toInt)
+
+    override fun observarFallidas(): Flow<Int> =
+        local.observarFallidas(MAX_INTENTOS).map(Long::toInt)
 
     private suspend fun subirPendientes(): Result<Unit> = runCatching {
         local.pendientesPorEnviar(MAX_INTENTOS).forEach { pendiente ->

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
@@ -229,12 +230,19 @@ class ProductoViewModel(
     private fun observarProductosLocales() {
         val repositorio = checkNotNull(productoRepository)
         trabajoListado = viewModelScope.launch {
-            repositorio.observar().collect { productos ->
+            combine(
+                repositorio.observar(),
+                repositorio.observarPendientes(),
+                repositorio.observarFallidas()
+            ) { productos, pendientes, fallidas -> Triple(productos, pendientes, fallidas) }
+                .collect { (productos, pendientes, fallidas) ->
                 _uiState.update {
                     it.copy(
                         productos = productos.map(Producto::toUi),
                         fase = if (productos.isEmpty()) ProductoFase.SinProductos else ProductoFase.ConProductos,
-                        ultimaSincronizacionMillis = repositorio.ultimaSincronizacion()
+                        ultimaSincronizacionMillis = repositorio.ultimaSincronizacion(),
+                        pendientesSincronizacion = pendientes,
+                        fallidasSincronizacion = fallidas
                     )
                 }
             }
