@@ -1,0 +1,81 @@
+package pe.edu.upeu.pharmamobilee.data.repository
+
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.respond
+import io.ktor.client.engine.mock.respondError
+import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpMethod
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.headersOf
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.runTest
+import pe.edu.upeu.pharmamobilee.data.local.ProductoLocal
+import pe.edu.upeu.pharmamobilee.data.remote.ProductoApi
+import pe.edu.upeu.pharmamobilee.data.remote.crearHttpClient
+import pe.edu.upeu.pharmamobilee.domain.model.Producto
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+
+class SincronizacionS13Test {
+    @Test
+    fun falloTransitorioSumaIntentoYNoMarcaFallida() = runTest {
+        val local = ProductoLocal(baseEnMemoria())
+        val pendiente = local.guardarPendiente(producto("Sin red"))
+        val api = api { request ->
+            when (request.method) {
+                HttpMethod.Post -> respondError(HttpStatusCode.ServiceUnavailable)
+                HttpMethod.Get -> respond(paginaVacia(), HttpStatusCode.OK, jsonHeaders())
+                else -> error("Solicitud no esperada")
+            }
+        }
+
+        ProductoRepositorioOffline(local, api, 1L).sincronizar().getOrThrow()
+
+        val fila = local.observar().first().single { it.id == pendiente.id }
+        assertEquals(1, fila.intentos)
+        assertTrue(fila.ultimoError?.isNotBlank() == true)
+        assertEquals(1L, local.observarPendientes(ProductoRepositorioOffline.MAX_INTENTOS).first())
+        assertEquals(0L, local.observarFallidas(ProductoRepositorioOffline.MAX_INTENTOS).first())
+    }
+
+    @Test
+    fun falloPermanenteMarcaFilaYNoLaReintenta() = runTest {
+        val local = ProductoLocal(baseEnMemoria())
+        val pendiente = local.guardarPendiente(producto("Duplicado"))
+        val api = api { request ->
+            when (request.method) {
+                HttpMethod.Post -> respondError(HttpStatusCode.Conflict)
+                HttpMethod.Get -> respond(paginaVacia(), HttpStatusCode.OK, jsonHeaders())
+                else -> error("Solicitud no esperada")
+            }
+        }
+
+        ProductoRepositorioOffline(local, api, 1L).sincronizar().getOrThrow()
+
+        val fila = local.observar().first().single { it.id == pendiente.id }
+        assertEquals(ProductoRepositorioOffline.MAX_INTENTOS, fila.intentos)
+        assertTrue(fila.ultimoError?.isNotBlank() == true)
+        assertEquals(0L, local.observarPendientes(ProductoRepositorioOffline.MAX_INTENTOS).first())
+        assertEquals(1L, local.observarFallidas(ProductoRepositorioOffline.MAX_INTENTOS).first())
+    }
+
+    @Test
+    fun esperaCrecienteTieneMaximoDeDieciseisSegundos() {
+        assertEquals(1_000L, ProductoRepositorioOffline.esperaCreciente(0))
+        assertEquals(2_000L, ProductoRepositorioOffline.esperaCreciente(1))
+        assertEquals(16_000L, ProductoRepositorioOffline.esperaCreciente(4))
+        assertEquals(16_000L, ProductoRepositorioOffline.esperaCreciente(99))
+    }
+
+    private fun api(responder: io.ktor.client.engine.mock.MockRequestHandler) =
+        ProductoApi(crearHttpClient(MockEngine(responder), "http://localhost/api/v1/"))
+
+    private fun producto(nombre: String) = Producto(
+        id = 0L, nombre = nombre, precio = 10.0, stock = 5, categoriaId = 1L, categoria = "Pruebas"
+    )
+
+    private fun paginaVacia() = """{"contenido":[],"pagina":0,"tamanio":100,"totalElementos":0,"totalPaginas":0,"ultima":true}"""
+    private fun jsonHeaders() = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+}
