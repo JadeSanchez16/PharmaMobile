@@ -2,6 +2,7 @@ package pe.edu.upeu.pharmamobilee.data.local
 
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
+import app.cash.sqldelight.coroutines.mapToOne
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import pe.edu.upeu.pharmamobilee.db.PharmaDb
@@ -12,6 +13,11 @@ import pe.edu.upeu.pharmamobilee.domain.model.Producto
 interface FuenteProductosLocal {
     fun observar(): Flow<List<Producto>>
     fun pendientes(): List<Producto>
+    fun pendientesPorEnviar(maxIntentos: Int): List<Producto>
+    fun observarPendientes(maxIntentos: Int): Flow<Long>
+    fun observarFallidas(maxIntentos: Int): Flow<Long>
+    fun sumarIntento(id: Long, ultimoError: String)
+    fun marcarFallida(id: Long, ultimoError: String, maxIntentos: Int)
     fun guardarPendiente(producto: Producto): Producto
     fun guardarSincronizado(producto: Producto)
     fun confirmarPendiente(idLocal: Long, productoServidor: Producto)
@@ -35,6 +41,23 @@ class ProductoLocal(base: PharmaDb) : FuenteProductosLocal {
 
     override fun pendientes(): List<Producto> =
         consultas.listarPendientes(::filaADominio).executeAsList()
+
+    override fun pendientesPorEnviar(maxIntentos: Int): List<Producto> =
+        consultas.pendientesPorEnviar(maxIntentos.toLong(), ::filaADominio).executeAsList()
+
+    override fun observarPendientes(maxIntentos: Int): Flow<Long> =
+        consultas.contarPendientes(maxIntentos.toLong()).asFlow().mapToOne(Dispatchers.Default)
+
+    override fun observarFallidas(maxIntentos: Int): Flow<Long> =
+        consultas.contarFallidas(maxIntentos.toLong()).asFlow().mapToOne(Dispatchers.Default)
+
+    override fun sumarIntento(id: Long, ultimoError: String) {
+        consultas.sumarIntento(ultimoError, id)
+    }
+
+    override fun marcarFallida(id: Long, ultimoError: String, maxIntentos: Int) {
+        consultas.marcarFallida(maxIntentos.toLong(), ultimoError, id)
+    }
 
     override fun guardarPendiente(producto: Producto): Producto {
         val menor = consultas.siguienteIdLocal().executeAsOne()
@@ -79,6 +102,8 @@ class ProductoLocal(base: PharmaDb) : FuenteProductosLocal {
             precio = producto.precio,
             stock = producto.stock.toLong(),
             pendiente = pendiente,
+            intentos = producto.intentos.toLong(),
+            ultimo_error = producto.ultimoError,
             activo = if (producto.activo) 1L else 0L,
             categoria_id = producto.categoriaId,
             categoria_nombre = producto.categoria,
@@ -93,6 +118,8 @@ private fun filaADominio(
     precio: Double,
     stock: Long,
     pendiente: Long,
+    intentos: Long,
+    ultimoError: String?,
     activo: Long,
     categoriaId: Long?,
     categoriaNombre: String,
@@ -106,5 +133,7 @@ private fun filaADominio(
     categoria = categoriaNombre,
     categoriaId = categoriaId,
     stockDisponible = stockDisponible == 1L,
-    origen = if (pendiente == 1L) OrigenProducto.LOCAL else OrigenProducto.REMOTO
+    origen = if (pendiente == 1L) OrigenProducto.LOCAL else OrigenProducto.REMOTO,
+    intentos = intentos.toInt(),
+    ultimoError = ultimoError
 )

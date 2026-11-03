@@ -124,6 +124,27 @@ class ProductoRepositorioOfflineTest {
 
         override fun pendientes(): List<Producto> = estado.value.filter { it.origen == OrigenProducto.LOCAL }
 
+        override fun pendientesPorEnviar(maxIntentos: Int): List<Producto> =
+            pendientes().filter { it.intentos < maxIntentos }
+
+        override fun observarPendientes(maxIntentos: Int): Flow<Long> =
+            MutableStateFlow(pendientesPorEnviar(maxIntentos).size.toLong())
+
+        override fun observarFallidas(maxIntentos: Int): Flow<Long> =
+            MutableStateFlow(pendientes().count { it.intentos >= maxIntentos }.toLong())
+
+        override fun sumarIntento(id: Long, ultimoError: String) {
+            estado.value = estado.value.map { producto ->
+                if (producto.id == id) producto.copy(intentos = producto.intentos + 1, ultimoError = ultimoError) else producto
+            }
+        }
+
+        override fun marcarFallida(id: Long, ultimoError: String, maxIntentos: Int) {
+            estado.value = estado.value.map { producto ->
+                if (producto.id == id) producto.copy(intentos = maxIntentos, ultimoError = ultimoError) else producto
+            }
+        }
+
         override fun guardarPendiente(producto: Producto): Producto {
             val id = (estado.value.minOfOrNull { it.id } ?: 0L).coerceAtMost(0L) - 1L
             return producto.copy(id = id, origen = OrigenProducto.LOCAL).also { nuevo ->
