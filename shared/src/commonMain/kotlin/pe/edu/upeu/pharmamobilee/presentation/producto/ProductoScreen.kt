@@ -42,6 +42,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import pe.edu.upeu.pharmamobilee.domain.permiso.EstadoPermiso
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -153,6 +154,39 @@ fun ProductoScreen(
                     Text("Sincronizar")
                 }
             }
+        }
+
+        when (uiState.permisoNotificaciones) {
+            EstadoPermiso.Concedido -> Text(
+                text = "Notificaciones de sincronización activadas",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary
+            )
+            EstadoPermiso.Denegado -> ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Avisos de sincronización", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        "Activa las notificaciones para recibir avisos cuando existan cambios pendientes o fallidos.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    OutlinedButton(onClick = viewModel::solicitarNotificaciones) {
+                        Text("Permitir notificaciones")
+                    }
+                }
+            }
+            EstadoPermiso.DenegadoParaSiempre -> ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Notificaciones bloqueadas", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        "El permiso fue bloqueado. Ábrelo en Ajustes para recibir avisos de sincronización.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    OutlinedButton(onClick = viewModel::abrirAjustesNotificaciones) {
+                        Text("Abrir Ajustes")
+                    }
+                }
+            }
+            null -> Unit
         }
 
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {

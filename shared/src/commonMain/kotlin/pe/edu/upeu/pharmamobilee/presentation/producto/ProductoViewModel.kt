@@ -14,6 +14,9 @@ import pe.edu.upeu.pharmamobilee.domain.error.ErrorApiException
 import pe.edu.upeu.pharmamobilee.domain.error.mensajeUsuario
 import pe.edu.upeu.pharmamobilee.domain.model.Producto
 import pe.edu.upeu.pharmamobilee.domain.platform.Compartidor
+import pe.edu.upeu.pharmamobilee.domain.permiso.EstadoPermiso
+import pe.edu.upeu.pharmamobilee.domain.permiso.GestorPermisos
+import pe.edu.upeu.pharmamobilee.domain.permiso.Permiso
 import pe.edu.upeu.pharmamobilee.domain.repository.ProductoRepository
 import pe.edu.upeu.pharmamobilee.domain.usecase.ActualizarProductoUseCase
 import pe.edu.upeu.pharmamobilee.domain.usecase.comoTextoParaCompartir
@@ -28,7 +31,8 @@ class ProductoViewModel(
     private val actualizarProductoUseCase: ActualizarProductoUseCase,
     private val eliminarProductoUseCase: EliminarProductoUseCase,
     private val compartidor: Compartidor,
-    private val productoRepository: ProductoRepository? = null
+    private val productoRepository: ProductoRepository? = null,
+    private val gestorPermisos: GestorPermisos? = null
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ProductoUiState())
     val uiState = _uiState.asStateFlow()
@@ -44,6 +48,7 @@ class ProductoViewModel(
             observarProductosLocales()
             sincronizar()
         }
+        actualizarEstadoNotificaciones()
     }
 
     fun actualizarNombre(nombre: String) {
@@ -224,6 +229,24 @@ class ProductoViewModel(
                 }
             }
             _uiState.update { it.copy(sincronizando = false) }
+        }
+    }
+
+    fun solicitarNotificaciones() {
+        val gestor = gestorPermisos ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(permisoNotificaciones = gestor.solicitar(Permiso.NOTIFICACIONES)) }
+        }
+    }
+
+    fun abrirAjustesNotificaciones() {
+        gestorPermisos?.abrirAjustes()
+    }
+
+    private fun actualizarEstadoNotificaciones() {
+        val gestor = gestorPermisos ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(permisoNotificaciones = gestor.estado(Permiso.NOTIFICACIONES)) }
         }
     }
 

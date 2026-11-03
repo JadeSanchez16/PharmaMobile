@@ -90,7 +90,8 @@ val presentationModule = module {
             actualizarProductoUseCase = get(),
             eliminarProductoUseCase = get(),
             compartidor = get(),
-            productoRepository = get()
+            productoRepository = get(),
+            gestorPermisos = getOrNull()
         )
     }
 }

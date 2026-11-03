@@ -1,5 +1,7 @@
 package pe.edu.upeu.pharmamobilee.presentation.producto
 
+import pe.edu.upeu.pharmamobilee.domain.permiso.EstadoPermiso
+
 data class ProductoUiState(
     val nombre: String = "",
     val precio: String = "",
@@ -19,7 +21,8 @@ data class ProductoUiState(
     val avisoSincronizacion: String? = null,
     val ultimaSincronizacionMillis: Long? = null,
     val pendientesSincronizacion: Int = 0,
-    val fallidasSincronizacion: Int = 0
+    val fallidasSincronizacion: Int = 0,
+    val permisoNotificaciones: EstadoPermiso? = null
 )
 
 sealed interface ProductoFase {

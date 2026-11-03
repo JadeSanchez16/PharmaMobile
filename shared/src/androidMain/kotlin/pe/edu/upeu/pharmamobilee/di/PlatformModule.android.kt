@@ -12,7 +12,9 @@ import pe.edu.upeu.pharmamobilee.data.local.AlmacenSeguroAndroid
 import pe.edu.upeu.pharmamobilee.data.local.CreadorDeDriver
 import pe.edu.upeu.pharmamobilee.data.local.CreadorDeDriverAndroid
 import pe.edu.upeu.pharmamobilee.domain.platform.Compartidor
+import pe.edu.upeu.pharmamobilee.domain.permiso.GestorPermisos
 import pe.edu.upeu.pharmamobilee.platform.CompartidorAndroid
+import pe.edu.upeu.pharmamobilee.permiso.GestorPermisosAndroid
 
 actual val platformModule: Module = module {
     single<HttpClientEngine> { OkHttp.create() }
@@ -23,4 +25,5 @@ actual val platformModule: Module = module {
     single<AlmacenSeguro> { AlmacenSeguroAndroid(androidContext()) }
     single<CreadorDeDriver> { CreadorDeDriverAndroid(androidContext()) }
     single<Compartidor> { CompartidorAndroid(androidContext()) }
+    single<GestorPermisos> { GestorPermisosAndroid(androidContext()) }
 }
