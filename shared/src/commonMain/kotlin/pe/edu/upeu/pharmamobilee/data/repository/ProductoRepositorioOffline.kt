@@ -49,6 +49,12 @@ class ProductoRepositorioOffline(
         val guardado = local.guardarPendiente(producto)
         // La escritura local ya ocurrió. Un fallo de red no revierte ni oculta el producto.
         val sincronizacion = sincronizar()
+        val validacionServidor = sincronizacion.exceptionOrNull() as? ErrorApiException
+        if (validacionServidor?.error is ErrorApi.Validacion) {
+            // La fila se conserva marcada para revisión, y el formulario recibe
+            // los mensajes exactos del backend en sus campos correspondientes.
+            return Result.failure(validacionServidor)
+        }
         return if (sincronizacion.isSuccess) {
             Result.success(producto.copy(origen = OrigenProducto.REMOTO))
         } else {
@@ -76,13 +82,16 @@ class ProductoRepositorioOffline(
     }
 
     override suspend fun sincronizar(): Result<Unit> {
-        subirPendientes().getOrElse { return Result.failure(it) }
-        return ejecutarLlamada {
+        val falloPermanente = subirPendientes().exceptionOrNull()
+        val descarga = ejecutarLlamada {
             remoto.listarTodas().map { it.toDomain() }
         }.map { productos ->
             local.reemplazarSincronizados(productos)
             local.guardarUltimaSincronizacion(Clock.System.now().toEpochMilliseconds())
         }
+        // Aunque una fila sea inválida, el catálogo remoto se actualiza. Se devuelve
+        // el fallo tipado para que el formulario explique qué debe corregirse.
+        return if (falloPermanente != null) Result.failure(falloPermanente) else descarga
     }
 
     override fun ultimaSincronizacion(): Long? = local.ultimaSincronizacion()
@@ -94,6 +103,7 @@ class ProductoRepositorioOffline(
         local.observarFallidas(MAX_INTENTOS).map(Long::toInt)
 
     private suspend fun subirPendientes(): Result<Unit> = runCatching {
+        var falloPermanente: ErrorApiException? = null
         local.pendientesPorEnviar(MAX_INTENTOS).forEach { pendiente ->
             when (val resultado = enviarPendiente(pendiente)) {
                 is ResultadoEnvio.Exito -> {
@@ -108,8 +118,12 @@ class ProductoRepositorioOffline(
                     )
                 }
 
-                is ResultadoEnvio.Permanente ->
+                is ResultadoEnvio.Permanente -> {
                     local.marcarFallida(pendiente.id, resultado.motivo, MAX_INTENTOS)
+                    if (falloPermanente == null) {
+                        falloPermanente = ErrorApiException(resultado.error)
+                    }
+                }
 
                 is ResultadoEnvio.Transitorio -> {
                     // Crear no es idempotente: no se repite automáticamente dentro
@@ -120,6 +134,7 @@ class ProductoRepositorioOffline(
                 }
             }
         }
+        falloPermanente?.let { throw it }
     }
 
     private suspend fun enviarPendiente(pendiente: Producto): ResultadoEnvio {
@@ -154,7 +169,7 @@ private fun Throwable.aResultadoEnvio(): ResultadoEnvio = when (
     ErrorApi.NoEncontrado,
     is ErrorApi.Conflicto,
     ErrorApi.SinPermiso,
-    ErrorApi.SesionExpirada -> ResultadoEnvio.Permanente(api.mensajeUsuario())
+    ErrorApi.SesionExpirada -> ResultadoEnvio.Permanente(api.mensajeUsuario(), api)
 
     null -> ResultadoEnvio.Transitorio("No se pudo completar el envío. Inténtalo nuevamente.")
 }

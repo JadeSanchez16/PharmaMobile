@@ -13,9 +13,12 @@ import kotlinx.coroutines.test.runTest
 import pe.edu.upeu.pharmamobilee.data.local.ProductoLocal
 import pe.edu.upeu.pharmamobilee.data.remote.ProductoApi
 import pe.edu.upeu.pharmamobilee.data.remote.crearHttpClient
+import pe.edu.upeu.pharmamobilee.domain.error.ErrorApi
+import pe.edu.upeu.pharmamobilee.domain.error.ErrorApiException
 import pe.edu.upeu.pharmamobilee.domain.model.Producto
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class SincronizacionS13Test {
@@ -31,9 +34,10 @@ class SincronizacionS13Test {
             }
         }
 
-        ProductoRepositorioOffline(local, api, 1L).sincronizar().getOrThrow()
+        val resultado = ProductoRepositorioOffline(local, api, 1L).sincronizar()
 
         val fila = local.observar().first().single { it.id == pendiente.id }
+        assertTrue(resultado.isSuccess)
         assertEquals(1, fila.intentos)
         assertTrue(fila.ultimoError?.isNotBlank() == true)
         assertEquals(1L, local.observarPendientes(ProductoRepositorioOffline.MAX_INTENTOS).first())
@@ -52,12 +56,37 @@ class SincronizacionS13Test {
             }
         }
 
-        ProductoRepositorioOffline(local, api, 1L).sincronizar().getOrThrow()
+        val resultado = ProductoRepositorioOffline(local, api, 1L).sincronizar()
 
         val fila = local.observar().first().single { it.id == pendiente.id }
+        assertTrue(resultado.exceptionOrNull() is ErrorApiException)
         assertEquals(ProductoRepositorioOffline.MAX_INTENTOS, fila.intentos)
         assertTrue(fila.ultimoError?.isNotBlank() == true)
         assertEquals(0L, local.observarPendientes(ProductoRepositorioOffline.MAX_INTENTOS).first())
+        assertEquals(1L, local.observarFallidas(ProductoRepositorioOffline.MAX_INTENTOS).first())
+    }
+
+    @Test
+    fun validacionDelServidorPermaneceEnColaYSePropagaAlFormulario() = runTest {
+        val local = ProductoLocal(baseEnMemoria())
+        val api = api { request ->
+            when (request.method) {
+                HttpMethod.Post -> respond(
+                    """{"message":"Existen errores de validación","validationErrors":{"precio":"El precio debe ser mayor o igual a 0.01"}}""",
+                    HttpStatusCode.BadRequest,
+                    jsonHeaders()
+                )
+                HttpMethod.Get -> respond(paginaVacia(), HttpStatusCode.OK, jsonHeaders())
+                else -> error("Solicitud no esperada")
+            }
+        }
+
+        val resultado = ProductoRepositorioOffline(local, api, 1L).registrar(producto("Precio cero").copy(precio = 0.0))
+
+        val error = resultado.exceptionOrNull() as? ErrorApiException
+        val validacion = error?.error as? ErrorApi.Validacion
+        assertNotNull(validacion)
+        assertEquals("El precio debe ser mayor o igual a 0.01", validacion.porCampo["precio"])
         assertEquals(1L, local.observarFallidas(ProductoRepositorioOffline.MAX_INTENTOS).first())
     }
 
