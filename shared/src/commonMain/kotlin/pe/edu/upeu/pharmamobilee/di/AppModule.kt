@@ -17,6 +17,8 @@ import pe.edu.upeu.pharmamobilee.data.remote.crearHttpClient
 import pe.edu.upeu.pharmamobilee.data.repository.ProductoRepositorioEnMemoria
 import pe.edu.upeu.pharmamobilee.data.repository.ProductoRepositorioOffline
 import pe.edu.upeu.pharmamobilee.data.repository.AuthRepositorioRest
+import pe.edu.upeu.pharmamobilee.data.firebase.TelemetriaFirebase
+import pe.edu.upeu.pharmamobilee.domain.port.Telemetria
 import pe.edu.upeu.pharmamobilee.domain.repository.AuthRepository
 import pe.edu.upeu.pharmamobilee.domain.repository.ProductoRepository
 import pe.edu.upeu.pharmamobilee.domain.usecase.ActualizarProductoUseCase
@@ -31,6 +33,7 @@ import pe.edu.upeu.pharmamobilee.presentation.producto.ProductoViewModel
 import pe.edu.upeu.pharmamobilee.db.PharmaDb
 
 val dataModule = module {
+    single<Telemetria> { TelemetriaFirebase() }
     single { GestorSesionHttp(get<AlmacenSeguro>()) }
     single {
         crearHttpClient(
@@ -91,7 +94,8 @@ val presentationModule = module {
             eliminarProductoUseCase = get(),
             compartidor = get(),
             productoRepository = get(),
-            gestorPermisos = getOrNull()
+            gestorPermisos = getOrNull(),
+            telemetria = getOrNull()
         )
     }
 }

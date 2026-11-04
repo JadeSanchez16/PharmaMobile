@@ -86,6 +86,8 @@ kotlin {
             implementation(libs.ktor.serialization.kotlinx.json)
             implementation(libs.sqldelight.runtime)
             implementation(libs.sqldelight.coroutines)
+            implementation(libs.firebase.crashlytics)
+            implementation(libs.firebase.messaging)
             implementation(compose.materialIconsExtended)
         }
         commonTest.dependencies {

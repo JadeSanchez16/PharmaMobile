@@ -17,6 +17,7 @@ import pe.edu.upeu.pharmamobilee.domain.platform.Compartidor
 import pe.edu.upeu.pharmamobilee.domain.permiso.EstadoPermiso
 import pe.edu.upeu.pharmamobilee.domain.permiso.GestorPermisos
 import pe.edu.upeu.pharmamobilee.domain.permiso.Permiso
+import pe.edu.upeu.pharmamobilee.domain.port.Telemetria
 import pe.edu.upeu.pharmamobilee.domain.repository.ProductoRepository
 import pe.edu.upeu.pharmamobilee.domain.usecase.ActualizarProductoUseCase
 import pe.edu.upeu.pharmamobilee.domain.usecase.comoTextoParaCompartir
@@ -32,7 +33,8 @@ class ProductoViewModel(
     private val eliminarProductoUseCase: EliminarProductoUseCase,
     private val compartidor: Compartidor,
     private val productoRepository: ProductoRepository? = null,
-    private val gestorPermisos: GestorPermisos? = null
+    private val gestorPermisos: GestorPermisos? = null,
+    private val telemetria: Telemetria? = null
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ProductoUiState())
     val uiState = _uiState.asStateFlow()
@@ -220,6 +222,10 @@ class ProductoViewModel(
                     )
                 }
             }.onFailure { error ->
+                telemetria?.registrarError(
+                    error,
+                    mapOf("pantalla" to "inventario", "operacion" to "sincronizar")
+                )
                 _uiState.update {
                     it.copy(
                         avisoRed = mensajeDe(error),
@@ -349,19 +355,31 @@ class ProductoViewModel(
                     )
                 }
 
-                else -> _uiState.update {
-                    it.copy(
-                        operacion = ProductoOperacion.Fallida(
-                            error.mensajeUsuario()
-                        )
+                else -> {
+                    telemetria?.registrarError(
+                        fallo,
+                        mapOf("pantalla" to "inventario", "operacion" to "crud_producto")
                     )
+                    _uiState.update {
+                        it.copy(
+                            operacion = ProductoOperacion.Fallida(
+                                error.mensajeUsuario()
+                            )
+                        )
+                    }
                 }
             }
 
-            else -> _uiState.update {
-                it.copy(
-                    operacion = ProductoOperacion.Fallida(mensajeDe(fallo))
+            else -> {
+                telemetria?.registrarError(
+                    fallo,
+                    mapOf("pantalla" to "inventario", "operacion" to "crud_producto")
                 )
+                _uiState.update {
+                    it.copy(
+                        operacion = ProductoOperacion.Fallida(mensajeDe(fallo))
+                    )
+                }
             }
         }
     }

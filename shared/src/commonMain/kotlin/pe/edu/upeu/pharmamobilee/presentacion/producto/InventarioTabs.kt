@@ -249,6 +249,11 @@ fun ProductCard(
     onEliminar: (() -> Unit)?,
     eliminando: Boolean = false
 ) {
+    // Una fila pendiente que alcanzó el límite no debe confundirse con una
+    // pendiente normal: el usuario necesita localizarla para corregirla.
+    val requiereRevision = producto.origen == OrigenProducto.LOCAL &&
+        producto.id < 0 && producto.producto.intentos >= 5
+
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(18.dp),
@@ -267,7 +272,26 @@ fun ProductCard(
                     else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            if (producto.origen == OrigenProducto.LOCAL && producto.id < 0) {
+            if (requiereRevision) {
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = MaterialTheme.colorScheme.errorContainer
+                ) {
+                    Text(
+                        text = "REQUIERE REVISIÓN · 5 intentos",
+                        modifier = Modifier.padding(horizontal = 11.dp, vertical = 5.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                }
+                producto.producto.ultimoError?.takeIf(String::isNotBlank)?.let { error ->
+                    Text(
+                        text = "Último error: $error",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            } else if (producto.origen == OrigenProducto.LOCAL && producto.id < 0) {
                 Surface(
                     shape = RoundedCornerShape(50),
                     color = MaterialTheme.colorScheme.tertiaryContainer
