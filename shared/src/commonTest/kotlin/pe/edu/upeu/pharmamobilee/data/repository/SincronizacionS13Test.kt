@@ -69,6 +69,46 @@ class SincronizacionS13Test {
         assertEquals(16_000L, ProductoRepositorioOffline.esperaCreciente(99))
     }
 
+    @Test
+    fun subePendientesAntesDeDescargarElCatalogo() = runTest {
+        val local = ProductoLocal(baseEnMemoria())
+        val pendiente = local.guardarPendiente(producto("Orden de sincronizacion"))
+        val orden = mutableListOf<HttpMethod>()
+        val api = api { request ->
+            orden += request.method
+            when (request.method) {
+                HttpMethod.Post -> respond(productoRespuesta(71, pendiente.nombre), HttpStatusCode.OK, jsonHeaders())
+                HttpMethod.Get -> respond(paginaCon(71, pendiente.nombre), HttpStatusCode.OK, jsonHeaders())
+                else -> error("Solicitud no esperada")
+            }
+        }
+
+        ProductoRepositorioOffline(local, api, 1L).sincronizar().getOrThrow()
+
+        assertEquals(listOf(HttpMethod.Post, HttpMethod.Get), orden)
+        assertEquals(0L, local.observarPendientes(ProductoRepositorioOffline.MAX_INTENTOS).first())
+    }
+
+    @Test
+    fun conflictoConMismoNombreSeConciliaSinCrearDuplicado() = runTest {
+        val local = ProductoLocal(baseEnMemoria())
+        val pendiente = local.guardarPendiente(producto("Producto ya recibido"))
+        val api = api { request ->
+            when (request.method) {
+                HttpMethod.Post -> respondError(HttpStatusCode.Conflict)
+                HttpMethod.Get -> respond(paginaCon(88, pendiente.nombre), HttpStatusCode.OK, jsonHeaders())
+                else -> error("Solicitud no esperada")
+            }
+        }
+
+        ProductoRepositorioOffline(local, api, 1L).sincronizar().getOrThrow()
+
+        val productos = local.observar().first()
+        assertEquals(listOf(88L), productos.map { it.id })
+        assertEquals(0L, local.observarPendientes(ProductoRepositorioOffline.MAX_INTENTOS).first())
+        assertEquals(0L, local.observarFallidas(ProductoRepositorioOffline.MAX_INTENTOS).first())
+    }
+
     private fun api(responder: io.ktor.client.engine.mock.MockRequestHandler) =
         ProductoApi(crearHttpClient(MockEngine(responder), "http://localhost/api/v1/"))
 
@@ -77,5 +117,7 @@ class SincronizacionS13Test {
     )
 
     private fun paginaVacia() = """{"contenido":[],"pagina":0,"tamanio":100,"totalElementos":0,"totalPaginas":0,"ultima":true}"""
+    private fun paginaCon(id: Long, nombre: String) = """{"contenido":[${productoRespuesta(id, nombre)}],"pagina":0,"tamanio":100,"totalElementos":1,"totalPaginas":1,"ultima":true}"""
+    private fun productoRespuesta(id: Long, nombre: String) = """{"id":$id,"nombre":"$nombre","precio":10.0,"stock":5,"estado":true,"categoriaId":1,"categoriaNombre":"Pruebas"}"""
     private fun jsonHeaders() = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
 }
