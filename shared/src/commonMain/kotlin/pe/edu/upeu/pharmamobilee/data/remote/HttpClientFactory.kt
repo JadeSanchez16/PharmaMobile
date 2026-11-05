@@ -48,7 +48,7 @@ fun crearHttpClient(
     install(Logging) {
         logger = object : Logger {
             override fun log(message: String) {
-                println("PharmaMobile-Ktor: $message")
+                registrarKtor(message)
             }
         }
         level = if (esDepuracion) LogLevel.HEADERS else LogLevel.NONE
