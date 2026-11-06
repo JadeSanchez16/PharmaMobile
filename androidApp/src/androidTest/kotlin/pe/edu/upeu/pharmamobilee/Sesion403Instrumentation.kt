@@ -55,6 +55,12 @@ class Sesion403Instrumentation : Instrumentation() {
             val gestor = koin.get<GestorSesionHttp>()
             val auth = koin.get<AuthRepository>()
             val cliente = koin.get<HttpClient>()
+            if (escenario?.startsWith("aa13-") == true) {
+                val texto = verificarActividad13(this, escenario!!, usuarioPrueba, clavePrueba)
+                resultado.putString("stream", "$texto\n")
+                finish(Activity.RESULT_OK, resultado)
+                return
+            }
             if (escenario == "aa11-e05-preparar") {
                 // Se ejecuta con el Pixel en modo avión. El valor no es un JWT real y
                 // nunca se registra: sirve para demostrar que el perfil local permite
