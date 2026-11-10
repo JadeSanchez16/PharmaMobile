@@ -11,8 +11,39 @@ import kotlinx.coroutines.test.runTest
 import pe.edu.upeu.pharmamobilee.data.remote.dto.ProductoRequestDto
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class ProductoApiCrudTest {
+
+    @Test
+    fun listarUsaGetConPaginacionYDeserializaElEnvoltorio() = runTest {
+        val engine = MockEngine { solicitud ->
+            assertEquals(HttpMethod.Get, solicitud.method)
+            assertEquals("/api/v1/productos", solicitud.url.encodedPath)
+            assertEquals("2", solicitud.url.parameters["pagina"])
+            assertEquals("15", solicitud.url.parameters["tamanio"])
+            respond(
+                content = paginatedResponse,
+                status = HttpStatusCode.OK,
+                headers = headersOf(
+                    HttpHeaders.ContentType,
+                    ContentType.Application.Json.toString()
+                )
+            )
+        }
+        val api = ProductoApi(
+            crearHttpClient(engine, "http://localhost/api/v1/")
+        )
+
+        val pagina = api.listar(pagina = 2, tamanio = 15)
+
+        assertEquals(2, pagina.pagina)
+        assertEquals(15, pagina.tamanio)
+        assertEquals(31L, pagina.totalElementos)
+        assertEquals(3, pagina.totalPaginas)
+        assertTrue(pagina.ultima)
+        assertEquals("Producto", pagina.contenido.single().nombre)
+    }
 
     @Test
     fun obtenerUsaGetConElId() = runTest {
@@ -90,6 +121,17 @@ class ProductoApiCrudTest {
               "estado": true,
               "categoriaId": 1,
               "categoriaNombre": "Pruebas"
+            }
+        """.trimIndent()
+
+        val paginatedResponse = """
+            {
+              "contenido": [$response],
+              "pagina": 2,
+              "tamanio": 15,
+              "totalElementos": 31,
+              "totalPaginas": 3,
+              "ultima": true
             }
         """.trimIndent()
     }

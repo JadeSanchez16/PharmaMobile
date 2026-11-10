@@ -1,5 +1,7 @@
 package pe.edu.upeu.pharmamobilee.data.repository
 
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import pe.edu.upeu.pharmamobilee.data.mapper.toDomain
 import pe.edu.upeu.pharmamobilee.data.mapper.toRequest
 import pe.edu.upeu.pharmamobilee.data.remote.ProductoApi
@@ -11,6 +13,10 @@ class ProductoRepositoryImpl(
     private val api: ProductoApi,
     private val categoriaPorDefecto: Long
 ) : ProductoRepository {
+
+    override fun observar(): Flow<List<Producto>> = flow { emit(listar().getOrThrow()) }
+
+    override suspend fun sincronizar(): Result<Unit> = listar().map { }
 
     override suspend fun listar(): Result<List<Producto>> = ejecutarLlamada {
         api.listar().contenido.map { it.toDomain() }

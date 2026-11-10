@@ -1,6 +1,7 @@
 package pe.edu.upeu.pharmamobilee.data.remote
 
 import io.ktor.client.call.body
+import io.ktor.client.network.sockets.SocketTimeoutException
 import io.ktor.client.plugins.ClientRequestException
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.plugins.ResponseException
@@ -25,6 +26,8 @@ suspend fun <T> ejecutarLlamada(
     Result.failure(ErrorApiException(ErrorApi.Servidor, error))
 } catch (error: HttpRequestTimeoutException) {
     Result.failure(ErrorApiException(ErrorApi.TiempoAgotado, error))
+} catch (error: SocketTimeoutException) {
+    Result.failure(ErrorApiException(ErrorApi.TiempoAgotado, error))
 } catch (error: IOException) {
     Result.failure(ErrorApiException(ErrorApi.SinConexion, error))
 } catch (error: JsonConvertException) {
@@ -38,12 +41,18 @@ suspend fun <T> ejecutarLlamada(
 private suspend fun traducirErrorCliente(
     error: ClientRequestException
 ): ErrorApi {
-    val cuerpo = runCatching {
+    val cuerpo = try {
         error.response.body<ErrorResponseDto>()
-    }.getOrNull()
+    } catch (cancelacion: CancellationException) {
+        throw cancelacion
+    } catch (_: Exception) {
+        null
+    }
 
     return when (error.response.status.value) {
         400 -> ErrorApi.Validacion(cuerpo?.validationErrors.orEmpty())
+        401 -> ErrorApi.SesionExpirada
+        403 -> ErrorApi.SinPermiso
         404 -> ErrorApi.NoEncontrado
         409 -> ErrorApi.Conflicto(
             cuerpo?.message ?: "La operación no está permitida."

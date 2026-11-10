@@ -3,6 +3,8 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.composeCompiler)
+    alias(libs.plugins.googleServices)
+    alias(libs.plugins.firebaseCrashlytics)
 }
 
 kotlin {
@@ -18,6 +20,9 @@ dependencies {
 
     implementation(libs.compose.uiToolingPreview)
     debugImplementation(libs.compose.uiTooling)
+    androidTestImplementation(libs.ktor.client.core)
+    androidTestImplementation(libs.kotlinx.coroutines.core)
+    androidTestImplementation(libs.koin.core)
 }
 
 android {
@@ -30,6 +35,7 @@ android {
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = 1
         versionName = "1.0"
+        testInstrumentationRunner = "pe.edu.upeu.pharmamobilee.Sesion403Instrumentation"
     }
     packaging {
         resources {

@@ -24,6 +24,18 @@ class ProductoApi(
             parameter("tamanio", tamanio)
         }.body()
 
+    /** Obtiene todas las páginas para que la sincronización no descarte productos remotos. */
+    suspend fun listarTodas(tamanio: Int = 100): List<ProductoResponseDto> {
+        var paginaActual = 0
+        val productos = mutableListOf<ProductoResponseDto>()
+        do {
+            val pagina = listar(pagina = paginaActual, tamanio = tamanio)
+            productos += pagina.contenido
+            paginaActual++
+        } while (!pagina.ultima)
+        return productos
+    }
+
     suspend fun obtener(id: Long): ProductoResponseDto =
         client.get("productos/$id").body()
 

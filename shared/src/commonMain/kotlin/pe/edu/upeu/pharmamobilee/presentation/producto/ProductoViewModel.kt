@@ -4,13 +4,21 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.CancellationException
 import pe.edu.upeu.pharmamobilee.domain.error.ErrorApi
 import pe.edu.upeu.pharmamobilee.domain.error.ErrorApiException
 import pe.edu.upeu.pharmamobilee.domain.error.mensajeUsuario
 import pe.edu.upeu.pharmamobilee.domain.model.Producto
 import pe.edu.upeu.pharmamobilee.domain.platform.Compartidor
+import pe.edu.upeu.pharmamobilee.domain.permiso.EstadoPermiso
+import pe.edu.upeu.pharmamobilee.domain.permiso.GestorPermisos
+import pe.edu.upeu.pharmamobilee.domain.permiso.Permiso
+import pe.edu.upeu.pharmamobilee.domain.port.Telemetria
+import pe.edu.upeu.pharmamobilee.domain.repository.ProductoRepository
 import pe.edu.upeu.pharmamobilee.domain.usecase.ActualizarProductoUseCase
 import pe.edu.upeu.pharmamobilee.domain.usecase.comoTextoParaCompartir
 import pe.edu.upeu.pharmamobilee.domain.usecase.EliminarProductoUseCase
@@ -23,13 +31,26 @@ class ProductoViewModel(
     private val registrarProductoUseCase: RegistrarProductoUseCase,
     private val actualizarProductoUseCase: ActualizarProductoUseCase,
     private val eliminarProductoUseCase: EliminarProductoUseCase,
-    private val compartidor: Compartidor
+    private val compartidor: Compartidor,
+    private val productoRepository: ProductoRepository? = null,
+    private val gestorPermisos: GestorPermisos? = null,
+    private val telemetria: Telemetria? = null
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ProductoUiState())
     val uiState = _uiState.asStateFlow()
+    private var trabajoListado: Job? = null
+    private var trabajoOperacion: Job? = null
+    private var trabajoSincronizacion: Job? = null
+    private var recargaPendiente = false
 
     init {
-        cargarProductos()
+        if (productoRepository == null) {
+            cargarProductos()
+        } else {
+            observarProductosLocales()
+            sincronizar()
+        }
+        actualizarEstadoNotificaciones()
     }
 
     fun actualizarNombre(nombre: String) {
@@ -57,19 +78,17 @@ class ProductoViewModel(
     fun guardarProducto() {
         if (_uiState.value.operacion is ProductoOperacion.EnCurso) return
 
-        viewModelScope.launch {
-            limpiarMensajes()
-            val estado = _uiState.value
-            val editando = estado.productoEnEdicionId != null
-            val tipo = if (editando) {
-                ProductoOperacion.Tipo.Actualizar
-            } else {
-                ProductoOperacion.Tipo.Crear
-            }
-            _uiState.update {
-                it.copy(operacion = ProductoOperacion.EnCurso(tipo))
-            }
-
+        val estado = _uiState.value
+        val editando = estado.productoEnEdicionId != null
+        val tipo = if (editando) {
+            ProductoOperacion.Tipo.Actualizar
+        } else {
+            ProductoOperacion.Tipo.Crear
+        }
+        // Reservar la operación antes de lanzar la corrutina evita dos pulsaciones en cola.
+        limpiarMensajes()
+        _uiState.update { it.copy(operacion = ProductoOperacion.EnCurso(tipo)) }
+        trabajoOperacion = viewModelScope.launch {
             val resultado = estado.productoEnEdicionId?.let { id ->
                 actualizarProductoUseCase(
                     id = id,
@@ -92,29 +111,29 @@ class ProductoViewModel(
             }
 
             limpiarFormulario()
-            recargarTrasOperacion(
-                if (editando) {
-                    "Producto \"${producto.nombre}\" actualizado correctamente"
-                } else {
-                    "Producto \"${producto.nombre}\" registrado correctamente"
-                }
-            )
+            val mensaje = if (editando) {
+                "Producto \"${producto.nombre}\" actualizado correctamente"
+            } else if (producto.id < 0) {
+                "Producto guardado localmente. Pendiente de sincronizar."
+            } else {
+                "Producto \"${producto.nombre}\" registrado correctamente"
+            }
+            if (productoRepository == null) recargarTrasOperacion(mensaje) else {
+                _uiState.update { it.copy(operacion = ProductoOperacion.Inactiva, mensajeExito = mensaje) }
+            }
         }
     }
 
     fun eliminarProducto(id: Long) {
         if (_uiState.value.operacion is ProductoOperacion.EnCurso) return
 
-        viewModelScope.launch {
-            limpiarMensajes()
-            _uiState.update {
-                it.copy(
-                    operacion = ProductoOperacion.EnCurso(
-                        ProductoOperacion.Tipo.Eliminar
-                    )
-                )
-            }
-
+        limpiarMensajes()
+        _uiState.update {
+            it.copy(
+                operacion = ProductoOperacion.EnCurso(ProductoOperacion.Tipo.Eliminar, id)
+            )
+        }
+        trabajoOperacion = viewModelScope.launch {
             eliminarProductoUseCase(id).getOrElse { error ->
                 manejarFalloOperacion(error)
                 return@launch
@@ -123,7 +142,9 @@ class ProductoViewModel(
             if (_uiState.value.productoEnEdicionId == id) {
                 limpiarFormulario()
             }
-            recargarTrasOperacion("Producto eliminado correctamente")
+            if (productoRepository == null) recargarTrasOperacion("Producto eliminado correctamente") else {
+                _uiState.update { it.copy(operacion = ProductoOperacion.Inactiva, mensajeExito = "Producto eliminado correctamente") }
+            }
         }
     }
 
@@ -156,8 +177,104 @@ class ProductoViewModel(
     }
 
     fun cargarProductos() {
-        viewModelScope.launch {
+        if (productoRepository != null) {
+            sincronizar()
+            return
+        }
+        trabajoListado?.cancel()
+        trabajoListado = viewModelScope.launch {
             cargarListado(mostrarCarga = true)
+        }
+    }
+
+    fun cancelarSolicitudesAlSalir() {
+        if (trabajoListado?.isActive == true || trabajoOperacion?.isActive == true || trabajoSincronizacion?.isActive == true) {
+            // El servidor puede haber recibido la mutación: reconciliar al volver.
+            recargaPendiente = true
+            trabajoListado?.cancel()
+            trabajoOperacion?.cancel()
+            trabajoSincronizacion?.cancel()
+            _uiState.update { it.copy(operacion = ProductoOperacion.Inactiva) }
+        }
+    }
+
+    fun reanudarSolicitudesAlEntrar() {
+        if (recargaPendiente) {
+            recargaPendiente = false
+            cargarProductos()
+        }
+    }
+
+    /** Acción explícita: la pantalla sigue leyendo de SQLDelight incluso si falla la red. */
+    fun sincronizar() {
+        val repositorio = productoRepository ?: run {
+            cargarProductos()
+            return
+        }
+        if (trabajoSincronizacion?.isActive == true) return
+        trabajoSincronizacion = viewModelScope.launch {
+            _uiState.update { it.copy(sincronizando = true, avisoRed = null, avisoSincronizacion = null) }
+            repositorio.sincronizar().onSuccess {
+                _uiState.update {
+                    it.copy(
+                        avisoSincronizacion = "Catálogo sincronizado correctamente",
+                        ultimaSincronizacionMillis = repositorio.ultimaSincronizacion()
+                    )
+                }
+            }.onFailure { error ->
+                telemetria?.registrarError(
+                    error,
+                    mapOf("pantalla" to "inventario", "operacion" to "sincronizar")
+                )
+                _uiState.update {
+                    it.copy(
+                        avisoRed = mensajeDe(error),
+                        avisoSincronizacion = null,
+                        operacion = if (it.operacion is ProductoOperacion.EnCurso) it.operacion else ProductoOperacion.Inactiva
+                    )
+                }
+            }
+            _uiState.update { it.copy(sincronizando = false) }
+        }
+    }
+
+    fun solicitarNotificaciones() {
+        val gestor = gestorPermisos ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(permisoNotificaciones = gestor.solicitar(Permiso.NOTIFICACIONES)) }
+        }
+    }
+
+    fun abrirAjustesNotificaciones() {
+        gestorPermisos?.abrirAjustes()
+    }
+
+    private fun actualizarEstadoNotificaciones() {
+        val gestor = gestorPermisos ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(permisoNotificaciones = gestor.estado(Permiso.NOTIFICACIONES)) }
+        }
+    }
+
+    private fun observarProductosLocales() {
+        val repositorio = checkNotNull(productoRepository)
+        trabajoListado = viewModelScope.launch {
+            combine(
+                repositorio.observar(),
+                repositorio.observarPendientes(),
+                repositorio.observarFallidas()
+            ) { productos, pendientes, fallidas -> Triple(productos, pendientes, fallidas) }
+                .collect { (productos, pendientes, fallidas) ->
+                _uiState.update {
+                    it.copy(
+                        productos = productos.map(Producto::toUi),
+                        fase = if (productos.isEmpty()) ProductoFase.SinProductos else ProductoFase.ConProductos,
+                        ultimaSincronizacionMillis = repositorio.ultimaSincronizacion(),
+                        pendientesSincronizacion = pendientes,
+                        fallidasSincronizacion = fallidas
+                    )
+                }
+            }
         }
     }
 
@@ -169,6 +286,7 @@ class ProductoViewModel(
         }
 
         val resultado = listarProductosUseCase()
+        (resultado.exceptionOrNull() as? CancellationException)?.let { throw it }
         resultado.onSuccess { productos ->
             _uiState.update {
                 it.copy(
@@ -216,6 +334,7 @@ class ProductoViewModel(
     }
 
     private fun manejarFalloOperacion(fallo: Throwable) {
+        if (fallo is CancellationException) throw fallo
         when (fallo) {
             is ProductoRegistroException -> _uiState.update {
                 it.copy(
@@ -236,19 +355,31 @@ class ProductoViewModel(
                     )
                 }
 
-                else -> _uiState.update {
-                    it.copy(
-                        operacion = ProductoOperacion.Fallida(
-                            error.mensajeUsuario()
-                        )
+                else -> {
+                    telemetria?.registrarError(
+                        fallo,
+                        mapOf("pantalla" to "inventario", "operacion" to "crud_producto")
                     )
+                    _uiState.update {
+                        it.copy(
+                            operacion = ProductoOperacion.Fallida(
+                                error.mensajeUsuario()
+                            )
+                        )
+                    }
                 }
             }
 
-            else -> _uiState.update {
-                it.copy(
-                    operacion = ProductoOperacion.Fallida(mensajeDe(fallo))
+            else -> {
+                telemetria?.registrarError(
+                    fallo,
+                    mapOf("pantalla" to "inventario", "operacion" to "crud_producto")
                 )
+                _uiState.update {
+                    it.copy(
+                        operacion = ProductoOperacion.Fallida(mensajeDe(fallo))
+                    )
+                }
             }
         }
     }

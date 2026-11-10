@@ -57,7 +57,6 @@ internal fun validarDatosProducto(
         precioError = when {
             precio.isBlank() -> "El precio es obligatorio"
             precioValor == null || !precioValor.isFinite() -> "El precio debe ser un número válido"
-            precioValor <= 0 -> "El precio debe ser mayor a 0"
             else -> null
         },
         stockError = when {

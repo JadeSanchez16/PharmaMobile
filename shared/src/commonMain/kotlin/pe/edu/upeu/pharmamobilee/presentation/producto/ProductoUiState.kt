@@ -1,5 +1,7 @@
 package pe.edu.upeu.pharmamobilee.presentation.producto
 
+import pe.edu.upeu.pharmamobilee.domain.permiso.EstadoPermiso
+
 data class ProductoUiState(
     val nombre: String = "",
     val precio: String = "",
@@ -13,7 +15,14 @@ data class ProductoUiState(
     val categoriaEnEdicionId: Long? = null,
     val productos: List<ProductoUi> = emptyList(),
     val fase: ProductoFase = ProductoFase.Cargando,
-    val operacion: ProductoOperacion = ProductoOperacion.Inactiva
+    val operacion: ProductoOperacion = ProductoOperacion.Inactiva,
+    val sincronizando: Boolean = false,
+    val avisoRed: String? = null,
+    val avisoSincronizacion: String? = null,
+    val ultimaSincronizacionMillis: Long? = null,
+    val pendientesSincronizacion: Int = 0,
+    val fallidasSincronizacion: Int = 0,
+    val permisoNotificaciones: EstadoPermiso? = null
 )
 
 sealed interface ProductoFase {
@@ -25,7 +34,7 @@ sealed interface ProductoFase {
 
 sealed interface ProductoOperacion {
     data object Inactiva : ProductoOperacion
-    data class EnCurso(val tipo: Tipo) : ProductoOperacion
+    data class EnCurso(val tipo: Tipo, val productoId: Long? = null) : ProductoOperacion
     data class Fallida(val mensaje: String) : ProductoOperacion
 
     enum class Tipo {
@@ -34,3 +43,11 @@ sealed interface ProductoOperacion {
         Eliminar
     }
 }
+
+val ProductoOperacion.guardando: Boolean
+    get() = this is ProductoOperacion.EnCurso &&
+        (tipo == ProductoOperacion.Tipo.Crear || tipo == ProductoOperacion.Tipo.Actualizar)
+
+fun ProductoOperacion.eliminando(id: Long): Boolean =
+    this is ProductoOperacion.EnCurso &&
+        tipo == ProductoOperacion.Tipo.Eliminar && productoId == id

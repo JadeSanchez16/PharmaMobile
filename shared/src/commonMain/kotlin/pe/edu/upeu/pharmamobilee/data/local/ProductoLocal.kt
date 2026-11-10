@@ -1,0 +1,139 @@
+package pe.edu.upeu.pharmamobilee.data.local
+
+import app.cash.sqldelight.coroutines.asFlow
+import app.cash.sqldelight.coroutines.mapToList
+import app.cash.sqldelight.coroutines.mapToOne
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import pe.edu.upeu.pharmamobilee.db.PharmaDb
+import pe.edu.upeu.pharmamobilee.domain.model.OrigenProducto
+import pe.edu.upeu.pharmamobilee.domain.model.Producto
+
+/** Contrato local para que el repositorio conserve la fuente de verdad en SQLDelight. */
+interface FuenteProductosLocal {
+    fun observar(): Flow<List<Producto>>
+    fun pendientes(): List<Producto>
+    fun pendientesPorEnviar(maxIntentos: Int): List<Producto>
+    fun observarPendientes(maxIntentos: Int): Flow<Long>
+    fun observarFallidas(maxIntentos: Int): Flow<Long>
+    fun sumarIntento(id: Long, ultimoError: String)
+    fun marcarFallida(id: Long, ultimoError: String, maxIntentos: Int)
+    fun guardarPendiente(producto: Producto): Producto
+    fun guardarSincronizado(producto: Producto)
+    fun confirmarPendiente(idLocal: Long, productoServidor: Producto)
+    fun eliminar(id: Long)
+    fun reemplazarSincronizados(productos: List<Producto>)
+    fun guardarUltimaSincronizacion(millis: Long)
+    fun ultimaSincronizacion(): Long?
+}
+
+/**
+ * Capa local aislada de Ktor y de los DTO. Solo traduce las filas SQLDelight al
+ * modelo de dominio y protege las escrituras compuestas con transacciones.
+ */
+class ProductoLocal(base: PharmaDb) : FuenteProductosLocal {
+    private val consultas = base.productoQueries
+
+    override fun observar(): Flow<List<Producto>> =
+        consultas.listarTodos(::filaADominio)
+            .asFlow()
+            .mapToList(Dispatchers.Default)
+
+    override fun pendientes(): List<Producto> =
+        consultas.listarPendientes(::filaADominio).executeAsList()
+
+    override fun pendientesPorEnviar(maxIntentos: Int): List<Producto> =
+        consultas.pendientesPorEnviar(maxIntentos.toLong(), ::filaADominio).executeAsList()
+
+    override fun observarPendientes(maxIntentos: Int): Flow<Long> =
+        consultas.contarPendientes(maxIntentos.toLong()).asFlow().mapToOne(Dispatchers.Default)
+
+    override fun observarFallidas(maxIntentos: Int): Flow<Long> =
+        consultas.contarFallidas(maxIntentos.toLong()).asFlow().mapToOne(Dispatchers.Default)
+
+    override fun sumarIntento(id: Long, ultimoError: String) {
+        consultas.sumarIntento(ultimoError, id)
+    }
+
+    override fun marcarFallida(id: Long, ultimoError: String, maxIntentos: Int) {
+        consultas.marcarFallida(maxIntentos.toLong(), ultimoError, id)
+    }
+
+    override fun guardarPendiente(producto: Producto): Producto {
+        val menor = consultas.siguienteIdLocal().executeAsOne()
+        val local = producto.copy(id = minOf(menor, 0L) - 1L, origen = OrigenProducto.LOCAL)
+        insertar(local, pendiente = 1L)
+        return local
+    }
+
+    override fun guardarSincronizado(producto: Producto) {
+        insertar(producto.copy(origen = OrigenProducto.REMOTO), pendiente = 0L)
+    }
+
+    override fun confirmarPendiente(idLocal: Long, productoServidor: Producto) {
+        consultas.transaction {
+            consultas.borrarPorId(idLocal)
+            insertar(productoServidor.copy(origen = OrigenProducto.REMOTO), pendiente = 0L)
+        }
+    }
+
+    override fun eliminar(id: Long) {
+        consultas.borrarPorId(id)
+    }
+
+    override fun reemplazarSincronizados(productos: List<Producto>) {
+        consultas.transaction {
+            consultas.borrarSincronizados()
+            productos.forEach { insertar(it.copy(origen = OrigenProducto.REMOTO), pendiente = 0L) }
+        }
+    }
+
+    override fun guardarUltimaSincronizacion(millis: Long) {
+        consultas.guardarUltimaSincronizacion(millis)
+    }
+
+    override fun ultimaSincronizacion(): Long? =
+        consultas.obtenerUltimaSincronizacion().executeAsOneOrNull()?.ultima_correcta_millis
+
+    private fun insertar(producto: Producto, pendiente: Long) {
+        consultas.insertar(
+            id = producto.id,
+            nombre = producto.nombre,
+            precio = producto.precio,
+            stock = producto.stock.toLong(),
+            pendiente = pendiente,
+            intentos = producto.intentos.toLong(),
+            ultimo_error = producto.ultimoError,
+            activo = if (producto.activo) 1L else 0L,
+            categoria_id = producto.categoriaId,
+            categoria_nombre = producto.categoria,
+            stock_disponible = if (producto.stockDisponible) 1L else 0L
+        )
+    }
+}
+
+private fun filaADominio(
+    id: Long,
+    nombre: String,
+    precio: Double,
+    stock: Long,
+    pendiente: Long,
+    intentos: Long,
+    ultimoError: String?,
+    activo: Long,
+    categoriaId: Long?,
+    categoriaNombre: String,
+    stockDisponible: Long
+): Producto = Producto(
+    id = id,
+    nombre = nombre,
+    precio = precio,
+    stock = stock.toInt(),
+    activo = activo == 1L,
+    categoria = categoriaNombre,
+    categoriaId = categoriaId,
+    stockDisponible = stockDisponible == 1L,
+    origen = if (pendiente == 1L) OrigenProducto.LOCAL else OrigenProducto.REMOTO,
+    intentos = intentos.toInt(),
+    ultimoError = ultimoError
+)

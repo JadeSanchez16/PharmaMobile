@@ -11,16 +11,22 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.LocalPharmacy
+import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Medication
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -41,6 +47,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -52,8 +59,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
-import pe.edu.upeu.pharmamobilee.domain.model.OrigenProducto
 import pe.edu.upeu.pharmamobilee.navigation.Screen
+import pe.edu.upeu.pharmamobilee.domain.model.Sesion
+import pe.edu.upeu.pharmamobilee.presentation.acerca.AcercaScreen
+import pe.edu.upeu.pharmamobilee.presentation.sesion.LoginScreen
+import pe.edu.upeu.pharmamobilee.presentation.sesion.SesionViewModel
 import pe.edu.upeu.pharmamobilee.presentacion.cliente.ClienteScreen
 import pe.edu.upeu.pharmamobilee.presentacion.inicio.InicioScreen
 import pe.edu.upeu.pharmamobilee.presentacion.pedido.PedidoScreen
@@ -61,6 +71,8 @@ import pe.edu.upeu.pharmamobilee.presentation.producto.ProductoScreen
 import pe.edu.upeu.pharmamobilee.presentation.producto.ProductoViewModel
 import pe.edu.upeu.pharmamobilee.theme.PharmaMobilTheme
 import org.koin.compose.viewmodel.koinViewModel
+import org.koin.compose.koinInject
+import pe.edu.upeu.pharmamobilee.data.remote.GestorSesionHttp
 
 private enum class TipoNavegacion {
     Compact,
@@ -78,22 +90,64 @@ private val opcionesNavegacion = listOf(
     OpcionNavegacion(Screen.Inicio, "Inicio", Icons.Default.Home),
     OpcionNavegacion(Screen.Productos, "Productos", Icons.Default.Medication),
     OpcionNavegacion(Screen.Clientes, "Clientes", Icons.Default.Person),
-    OpcionNavegacion(Screen.Pedidos, "Pedidos", Icons.Default.ShoppingCart)
+    OpcionNavegacion(Screen.Pedidos, "Pedidos", Icons.Default.ShoppingCart),
+    OpcionNavegacion(Screen.Acerca, "Acerca de", Icons.Default.Info)
 )
 
 @Composable
 fun App() {
+    val gestorSesionHttp = koinInject<GestorSesionHttp>()
+    val sinPermiso by gestorSesionHttp.sinPermiso.collectAsState()
+    val sesionViewModel = koinViewModel<SesionViewModel>()
+    val sesionUiState by sesionViewModel.uiState.collectAsState()
+    val sesion = sesionUiState.sesion
     var pantallaActual by remember {
         mutableStateOf<Screen>(Screen.Inicio)
     }
 
+    val systemInDarkTheme = isSystemInDarkTheme()
     var darkTheme by remember {
-        mutableStateOf(false)
+        mutableStateOf(systemInDarkTheme)
+    }
+    LaunchedEffect(sesion?.usuario) {
+        if (sesion != null) pantallaActual = Screen.Inicio
     }
 
     PharmaMobilTheme(
         darkTheme = darkTheme
     ) {
+        if (sesion != null && sinPermiso != null) {
+            AlertDialog(
+                onDismissRequest = gestorSesionHttp::descartarSinPermiso,
+                title = { Text("Acceso no permitido") },
+                text = { Text(sinPermiso!!.message) },
+                confirmButton = {
+                    TextButton(onClick = gestorSesionHttp::descartarSinPermiso) {
+                        Text("Entendido")
+                    }
+                }
+            )
+        }
+        when {
+            sesionUiState.comprobandoSesion -> {
+                BoxWithConstraints(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
+                }
+            }
+
+            sesion == null -> {
+                LoginScreen(
+                    uiState = sesionUiState,
+                    onUsuarioChange = sesionViewModel::actualizarUsuario,
+                    onClaveChange = sesionViewModel::actualizarClave,
+                    onIngresar = sesionViewModel::ingresar
+                )
+            }
+
+            else -> {
             BoxWithConstraints(
                 modifier = Modifier.fillMaxSize()
             ) {
@@ -112,9 +166,13 @@ fun App() {
                     onDarkThemeChange = {
                         darkTheme = it
                     },
-                    tipoNavegacion = tipoNavegacion
+                    tipoNavegacion = tipoNavegacion,
+                    sesion = sesion,
+                    onCerrarSesion = sesionViewModel::salir
                 )
             }
+            }
+        }
     }
 }
 
@@ -124,7 +182,9 @@ private fun PharmaMobilLayout(
     onSeleccionarPantalla: (Screen) -> Unit,
     darkTheme: Boolean,
     onDarkThemeChange: (Boolean) -> Unit,
-    tipoNavegacion: TipoNavegacion
+    tipoNavegacion: TipoNavegacion,
+    sesion: Sesion,
+    onCerrarSesion: () -> Unit
 ) {
     val drawerState = rememberDrawerState(
         initialValue = DrawerValue.Closed
@@ -146,7 +206,9 @@ private fun PharmaMobilLayout(
                                 }
                             },
                             darkTheme = darkTheme,
-                            onDarkThemeChange = onDarkThemeChange
+                            onDarkThemeChange = onDarkThemeChange,
+                            sesion = sesion,
+                            onCerrarSesion = onCerrarSesion
                         )
                     }
                 }
@@ -161,7 +223,9 @@ private fun PharmaMobilLayout(
                         scope.launch {
                             drawerState.open()
                         }
-                    }
+                    },
+                    sesion = sesion,
+                    onCerrarSesion = onCerrarSesion
                 )
             }
         }
@@ -173,7 +237,7 @@ private fun PharmaMobilLayout(
                 NavigationRail(
                     modifier = Modifier.fillMaxHeight()
                 ) {
-                    opcionesNavegacion.forEach { opcion ->
+                    opcionesPara(sesion).forEach { opcion ->
                         NavigationRailItem(
                             selected = pantallaActual::class == opcion.screen::class,
                             onClick = {
@@ -209,7 +273,9 @@ private fun PharmaMobilLayout(
                     darkTheme = darkTheme,
                     onDarkThemeChange = onDarkThemeChange,
                     mostrarMenu = false,
-                    onMenuClick = {}
+                    onMenuClick = {},
+                    sesion = sesion,
+                    onCerrarSesion = onCerrarSesion
                 )
             }
         }
@@ -222,7 +288,9 @@ private fun PharmaMobilLayout(
                             pantallaActual = pantallaActual,
                             onSeleccionarPantalla = onSeleccionarPantalla,
                             darkTheme = darkTheme,
-                            onDarkThemeChange = onDarkThemeChange
+                            onDarkThemeChange = onDarkThemeChange,
+                            sesion = sesion,
+                            onCerrarSesion = onCerrarSesion
                         )
                     }
                 }
@@ -233,7 +301,9 @@ private fun PharmaMobilLayout(
                     darkTheme = darkTheme,
                     onDarkThemeChange = onDarkThemeChange,
                     mostrarMenu = false,
-                    onMenuClick = {}
+                    onMenuClick = {},
+                    sesion = sesion,
+                    onCerrarSesion = onCerrarSesion
                 )
             }
         }
@@ -249,13 +319,13 @@ private fun PharmaMobilScaffold(
     darkTheme: Boolean,
     onDarkThemeChange: (Boolean) -> Unit,
     mostrarMenu: Boolean,
-    onMenuClick: () -> Unit
+    onMenuClick: () -> Unit,
+    sesion: Sesion,
+    onCerrarSesion: () -> Unit
 ) {
     val productoViewModel = koinViewModel<ProductoViewModel>()
     val productoUiState by productoViewModel.uiState.collectAsState()
-    val productosLocales = productoUiState.productos.filter {
-        it.origen == OrigenProducto.LOCAL
-    }
+    val productosDisponibles = productoUiState.productos
 
     Scaffold(
         modifier = modifier,
@@ -266,9 +336,9 @@ private fun PharmaMobilScaffold(
                     Column {
                         Text(text = tituloPantalla(pantallaActual), style = MaterialTheme.typography.titleLarge)
                         Text(
-                            text = "PharmaMobil",
+                            text = "PharmaMobile",
                             style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary
+                            color = MaterialTheme.colorScheme.secondaryContainer
                         )
                     }
                 },
@@ -279,22 +349,31 @@ private fun PharmaMobilScaffold(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Menu,
-                                contentDescription = "Abrir menú"
+                                contentDescription = "Abrir menú",
+                                tint = MaterialTheme.colorScheme.onPrimary
                             )
                         }
                     }
                 },
                 actions = {
+                    IconButton(onClick = onCerrarSesion) {
+                        Icon(
+                            imageVector = Icons.Default.Logout,
+                            contentDescription = "Cerrar sesión",
+                            tint = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
                     IconButton(onClick = { onDarkThemeChange(!darkTheme) }) {
                         Icon(
                             imageVector = if (darkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
-                            contentDescription = if (darkTheme) "Activar modo claro" else "Activar modo oscuro"
+                            contentDescription = if (darkTheme) "Activar modo claro" else "Activar modo oscuro",
+                            tint = MaterialTheme.colorScheme.onPrimary
                         )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimary
                 )
             )
         }
@@ -307,18 +386,22 @@ private fun PharmaMobilScaffold(
             when (pantallaActual) {
                 Screen.Inicio -> {
                     InicioScreen(
-                        totalProductos = productosLocales.size,
-                        productosActivos = productosLocales.count { it.activo },
-                        productosBajoStock = productosLocales.count { it.requiereReposicion },
+                        totalProductos = productosDisponibles.size,
+                        productosActivos = productosDisponibles.count { it.activo },
+                        productosInactivos = productosDisponibles.count { !it.activo },
+                        productosBajoStock = productosDisponibles.count { it.requiereReposicion },
                         onProductosClick = { onSeleccionarPantalla(Screen.Productos) },
                         onClientesClick = { onSeleccionarPantalla(Screen.Clientes) },
-                        onPedidosClick = { onSeleccionarPantalla(Screen.Pedidos) }
+                        onPedidosClick = { onSeleccionarPantalla(Screen.Pedidos) },
+                        mostrarClientes = sesion.puede("CLIENTES_LEER"),
+                        mostrarPedidos = sesion.puede("VENTAS_LEER")
                     )
                 }
 
                 Screen.Productos -> {
                     ProductoScreen(
-                        viewModel = productoViewModel
+                        viewModel = productoViewModel,
+                        puedeEditar = sesion.puede("CATALOGO_ESCRIBIR")
                     )
                 }
 
@@ -328,6 +411,10 @@ private fun PharmaMobilScaffold(
 
                 Screen.Pedidos -> {
                     PedidoScreen()
+                }
+
+                Screen.Acerca -> {
+                    AcercaScreen()
                 }
             }
         }
@@ -339,7 +426,9 @@ private fun DrawerContent(
     pantallaActual: Screen,
     onSeleccionarPantalla: (Screen) -> Unit,
     darkTheme: Boolean,
-    onDarkThemeChange: (Boolean) -> Unit
+    onDarkThemeChange: (Boolean) -> Unit,
+    sesion: Sesion,
+    onCerrarSesion: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxHeight()) {
         DrawerHeader()
@@ -352,7 +441,7 @@ private fun DrawerContent(
             modifier = Modifier.padding(start = 28.dp, top = 20.dp, bottom = 8.dp)
         )
 
-        opcionesNavegacion.forEach { opcion ->
+        opcionesPara(sesion).forEach { opcion ->
             NavigationDrawerItem(
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
                 label = { Text(opcion.titulo) },
@@ -365,6 +454,24 @@ private fun DrawerContent(
         }
 
         Spacer(modifier = Modifier.weight(1f))
+        Text(
+            text = sesion.nombreCompleto,
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.padding(horizontal = 28.dp, vertical = 4.dp)
+        )
+        Text(
+            text = sesion.roles.joinToString(),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 28.dp, vertical = 2.dp)
+        )
+        NavigationDrawerItem(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
+            label = { Text("Cerrar sesión") },
+            selected = false,
+            onClick = onCerrarSesion,
+            icon = { Icon(Icons.Default.Logout, contentDescription = null) }
+        )
         HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
         ThemeSwitch(
             darkTheme = darkTheme,
@@ -372,6 +479,15 @@ private fun DrawerContent(
         )
     }
 }
+
+private fun opcionesPara(sesion: Sesion): List<OpcionNavegacion> =
+    opcionesNavegacion.filter { opcion ->
+        when (opcion.screen) {
+            Screen.Clientes -> sesion.puede("CLIENTES_LEER")
+            Screen.Pedidos -> sesion.puede("VENTAS_LEER")
+            else -> true
+        }
+    }
 
 @Composable
 private fun DrawerHeader() {
@@ -447,8 +563,9 @@ private fun tituloPantalla(
 ): String {
     return when (screen) {
         Screen.Inicio -> "Inicio"
-        Screen.Productos -> "Productos"
+        Screen.Productos -> "Inventario"
         Screen.Clientes -> "Clientes"
         Screen.Pedidos -> "Pedidos"
+        Screen.Acerca -> "Acerca de"
     }
 }

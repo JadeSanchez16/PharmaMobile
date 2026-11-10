@@ -13,8 +13,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddBox
+import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Inventory2
@@ -33,16 +36,19 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import pe.edu.upeu.pharmamobilee.domain.permiso.EstadoPermiso
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import kotlin.time.Clock
 import pe.edu.upeu.pharmamobilee.domain.model.Producto
 import pe.edu.upeu.pharmamobilee.presentacion.components.EmptyState
 import pe.edu.upeu.pharmamobilee.presentacion.components.ErrorState
@@ -54,11 +60,17 @@ import pe.edu.upeu.pharmamobilee.presentacion.producto.InventarioTabs
 @Composable
 fun ProductoScreen(
     viewModel: ProductoViewModel,
+    puedeEditar: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
-    var formularioExpandido by remember { mutableStateOf(true) }
+    var formularioExpandido by remember { mutableStateOf(false) }
+
+    DisposableEffect(viewModel) {
+        viewModel.reanudarSolicitudesAlEntrar()
+        onDispose { viewModel.cancelarSolicitudesAlSalir() }
+    }
 
     LaunchedEffect(uiState.mensajeExito) {
         uiState.mensajeExito?.let { snackbarHostState.showSnackbar(it) }
@@ -80,11 +92,102 @@ fun ProductoScreen(
             .padding(horizontal = 20.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        SectionHeader(
-            title = "Gestiona tu inventario",
-            description = "Controla precios, disponibilidad y reposición desde una sola vista.",
-            icon = Icons.Default.Medication
-        )
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.primaryContainer
+        ) {
+            SectionHeader(
+                title = "Gestión de inventario",
+                description = "Administra productos, existencias y disponibilidad.",
+                icon = Icons.Default.Medication,
+                modifier = Modifier.padding(18.dp)
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = textoUltimaSincronizacion(uiState.ultimaSincronizacionMillis),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (uiState.pendientesSincronizacion > 0) {
+                    Text(
+                        text = "${uiState.pendientesSincronizacion} cambios por enviar",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.tertiary
+                    )
+                }
+                if (uiState.fallidasSincronizacion > 0) {
+                    Text(
+                        text = "${uiState.fallidasSincronizacion} cambios requieren revisión. Corrige sus datos y pulsa Sincronizar.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+                uiState.avisoRed?.let { aviso ->
+                    Text(
+                        text = aviso,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+                uiState.avisoSincronizacion?.let { aviso ->
+                    Text(
+                        text = aviso,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+            OutlinedButton(
+                onClick = viewModel::sincronizar,
+                enabled = !uiState.sincronizando
+            ) {
+                if (uiState.sincronizando) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                } else {
+                    Text("Sincronizar")
+                }
+            }
+        }
+
+        when (uiState.permisoNotificaciones) {
+            EstadoPermiso.Concedido -> Text(
+                text = "Notificaciones de sincronización activadas",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary
+            )
+            EstadoPermiso.Denegado -> ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Avisos de sincronización", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        "Activa las notificaciones para recibir avisos cuando existan cambios pendientes o fallidos.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    OutlinedButton(onClick = viewModel::solicitarNotificaciones) {
+                        Text("Permitir notificaciones")
+                    }
+                }
+            }
+            EstadoPermiso.DenegadoParaSiempre -> ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Notificaciones bloqueadas", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        "El permiso fue bloqueado. Ábrelo en Ajustes para recibir avisos de sincronización.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    OutlinedButton(onClick = viewModel::abrirAjustesNotificaciones) {
+                        Text("Abrir Ajustes")
+                    }
+                }
+            }
+            null -> Unit
+        }
 
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
             val formulario: @Composable () -> Unit = {
@@ -104,13 +207,15 @@ fun ProductoScreen(
                 ProductoContenido(
                     uiState = uiState,
                     onReintentar = viewModel::cargarProductos,
-                    onEditarProducto = viewModel::editarProducto,
-                    onEliminarProducto = viewModel::eliminarProducto,
+                    onEditarProducto = if (puedeEditar) viewModel::editarProducto else null,
+                    onEliminarProducto = if (puedeEditar) viewModel::eliminarProducto else null,
                     onCompartirProducto = viewModel::compartir
                 )
             }
 
-            if (maxWidth >= 600.dp) {
+            if (!puedeEditar) {
+                inventario()
+            } else if (maxWidth >= 600.dp) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(20.dp),
                     verticalAlignment = Alignment.Top
@@ -133,12 +238,33 @@ fun ProductoScreen(
     }
 }
 
+internal fun textoUltimaSincronizacion(
+    ultimaSincronizacionMillis: Long?,
+    ahoraMillis: Long = Clock.System.now().toEpochMilliseconds()
+): String {
+    if (ultimaSincronizacionMillis == null) return "Aún no se ha sincronizado el catálogo"
+    val diferencia = (ahoraMillis - ultimaSincronizacionMillis).coerceAtLeast(0L)
+    val minutos = diferencia / 60_000L
+    return when {
+        minutos < 1L -> "Actualizado hace menos de un minuto"
+        minutos < 60L -> "Actualizado hace $minutos ${if (minutos == 1L) "minuto" else "minutos"}"
+        minutos < 1_440L -> {
+            val horas = minutos / 60L
+            "Actualizado hace $horas ${if (horas == 1L) "hora" else "horas"}"
+        }
+        else -> {
+            val dias = minutos / 1_440L
+            "Actualizado hace $dias ${if (dias == 1L) "día" else "días"}"
+        }
+    }
+}
+
 @Composable
 private fun ProductoContenido(
     uiState: ProductoUiState,
     onReintentar: () -> Unit,
-    onEditarProducto: (Producto) -> Unit,
-    onEliminarProducto: (Long) -> Unit,
+    onEditarProducto: ((Producto) -> Unit)?,
+    onEliminarProducto: ((Long) -> Unit)?,
     onCompartirProducto: (Producto) -> Unit
 ) {
     when (val fase = uiState.fase) {
@@ -160,8 +286,7 @@ private fun ProductoContenido(
                     onEditarProducto = onEditarProducto,
                     onEliminarProducto = onEliminarProducto,
                     onCompartirProducto = onCompartirProducto,
-                    eliminando = (uiState.operacion as? ProductoOperacion.EnCurso)
-                        ?.tipo == ProductoOperacion.Tipo.Eliminar
+                    operacion = uiState.operacion
                 )
             }
 
@@ -183,9 +308,7 @@ private fun ProductoFormulario(
     expandido: Boolean,
     onExpandidoChange: (Boolean) -> Unit
 ) {
-    val operacionEnCurso = uiState.operacion as? ProductoOperacion.EnCurso
-    val guardando = operacionEnCurso?.tipo == ProductoOperacion.Tipo.Crear ||
-        operacionEnCurso?.tipo == ProductoOperacion.Tipo.Actualizar
+    val guardando = uiState.operacion.guardando
 
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -199,7 +322,8 @@ private fun ProductoFormulario(
             ) {
                 Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer) {
                     Icon(
-                        imageVector = Icons.Default.Medication,
+                        imageVector = if (uiState.productoEnEdicionId == null) Icons.Default.AddBox
+                        else Icons.Default.EditNote,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSecondaryContainer,
                         modifier = Modifier.padding(10.dp).size(24.dp)
@@ -207,11 +331,11 @@ private fun ProductoFormulario(
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = if (uiState.productoEnEdicionId == null) "Nuevo producto" else "Editar producto",
+                        text = if (uiState.productoEnEdicionId == null) "Agregar producto" else "Editar producto",
                         style = MaterialTheme.typography.titleLarge
                     )
                     Text(
-                        text = "Completa los datos comerciales y de inventario.",
+                        text = if (expandido) "Completa los datos del inventario." else "Toca para desplegar el formulario.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -297,6 +421,15 @@ private fun ProductoFormulario(
                         strokeWidth = 2.dp
                     )
                 } else {
+                    Icon(
+                        imageVector = if (uiState.productoEnEdicionId == null) {
+                            Icons.Default.AddBox
+                        } else {
+                            Icons.Default.Inventory2
+                        },
+                        contentDescription = null,
+                        modifier = Modifier.padding(end = 8.dp).size(20.dp)
+                    )
                     Text(
                         if (uiState.productoEnEdicionId == null) {
                             "Registrar"
@@ -310,7 +443,6 @@ private fun ProductoFormulario(
             if (uiState.productoEnEdicionId != null) {
                 OutlinedButton(
                     onClick = onCancelarEdicion,
-                    enabled = !guardando,
                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
                 ) {
                     Text("Cancelar edición")

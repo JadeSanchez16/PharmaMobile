@@ -15,8 +15,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
@@ -24,14 +24,15 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -48,6 +49,10 @@ import pe.edu.upeu.pharmamobilee.domain.model.OrigenProducto
 import pe.edu.upeu.pharmamobilee.domain.model.Producto
 import pe.edu.upeu.pharmamobilee.presentacion.components.SectionHeader
 import pe.edu.upeu.pharmamobilee.presentation.producto.ProductoUi
+import pe.edu.upeu.pharmamobilee.presentation.producto.ProductoOperacion
+import pe.edu.upeu.pharmamobilee.presentation.producto.eliminando
+import pe.edu.upeu.pharmamobilee.theme.AzulClaro
+import pe.edu.upeu.pharmamobilee.theme.AzulNoche
 
 private val tabs = listOf(
     ProductoTab("Activos", Icons.Default.CheckCircle),
@@ -66,7 +71,7 @@ fun InventarioTabs(
     onEditarProducto: ((Producto) -> Unit)?,
     onEliminarProducto: ((Long) -> Unit)?,
     onCompartirProducto: ((Producto) -> Unit)?,
-    eliminando: Boolean,
+    operacion: ProductoOperacion,
     modifier: Modifier = Modifier
 ) {
     var tabSeleccionada by remember {
@@ -89,34 +94,34 @@ fun InventarioTabs(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         SectionHeader(
-            title = "Inventario",
-            description = "${productosFiltrados.size} productos en esta categoría",
+            title = "Catálogo de productos",
+            description = "${productosFiltrados.size} productos en la vista seleccionada",
             icon = Icons.Default.Inventory2
         )
 
-        Surface(
-            shape = MaterialTheme.shapes.large,
-            tonalElevation = 2.dp,
-            color = MaterialTheme.colorScheme.surfaceContainer
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(7.dp)
         ) {
-            PrimaryTabRow(
-                selectedTabIndex = tabSeleccionada,
-                containerColor = MaterialTheme.colorScheme.surfaceContainer
-            ) {
-                tabs.forEachIndexed { index, tab ->
-                    Tab(
-                        selected = tabSeleccionada == index,
-                        onClick = { tabSeleccionada = index },
-                        text = { Text(tab.titulo) },
-                        icon = {
-                            Icon(
-                                imageVector = tab.icono,
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                    )
-                }
+            tabs.forEachIndexed { index, tab ->
+                FilterChip(
+                    modifier = Modifier.weight(1f),
+                    selected = tabSeleccionada == index,
+                    onClick = { tabSeleccionada = index },
+                    label = {
+                        Text(
+                            tab.titulo,
+                            maxLines = 1
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = tab.icono,
+                            contentDescription = null,
+                            modifier = Modifier.size(17.dp)
+                        )
+                    }
+                )
             }
         }
 
@@ -125,7 +130,7 @@ fun InventarioTabs(
             onValueChange = { busqueda = it },
             modifier = Modifier.fillMaxWidth(),
             label = { Text("Buscar producto") },
-            placeholder = { Text("Ej. Paracetamol") },
+            placeholder = { Text("Nombre del producto") },
             leadingIcon = {
                 Icon(imageVector = Icons.Default.Search, contentDescription = null)
             },
@@ -138,31 +143,41 @@ fun InventarioTabs(
             },
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             singleLine = true,
-            shape = MaterialTheme.shapes.large
+            shape = RoundedCornerShape(18.dp)
         )
 
         ListaProductos(
             productos = productosFiltrados,
             onEditarProducto = onEditarProducto,
             onCompartirProducto = onCompartirProducto,
-            onSolicitarEliminar = {
-                if (!eliminando) productoAEliminar = it
+            operacion = operacion,
+            onSolicitarEliminar = onEliminarProducto?.let {
+                { producto ->
+                    if (operacion !is ProductoOperacion.EnCurso) productoAEliminar = producto
+                }
             }
         )
     }
 
-    productoAEliminar?.let { producto ->
+    if (onEliminarProducto != null) productoAEliminar?.let { producto ->
         AlertDialog(
             onDismissRequest = { productoAEliminar = null },
             title = { Text("Eliminar producto") },
             text = {
-                Text("¿Deseas eliminar ${producto.nombre}? Esta acción dará de baja el producto en PharmaSoft.")
+                Text(
+                    if (producto.id < 0) {
+                        "¿Deseas eliminar ${producto.nombre}? Se quitará el registro pendiente de este dispositivo."
+                    } else {
+                        "¿Deseas eliminar ${producto.nombre}? Esta acción dará de baja el producto en PharmaSoft."
+                    }
+                )
             },
             confirmButton = {
                 TextButton(
+                    enabled = !operacion.eliminando(producto.id),
                     onClick = {
                         productoAEliminar = null
-                        onEliminarProducto?.invoke(producto.id)
+                        onEliminarProducto(producto.id)
                     }
                 ) {
                     Text("Eliminar")
@@ -182,7 +197,8 @@ private fun ListaProductos(
     productos: List<ProductoUi>,
     onEditarProducto: ((Producto) -> Unit)?,
     onCompartirProducto: ((Producto) -> Unit)?,
-    onSolicitarEliminar: (ProductoUi) -> Unit
+    operacion: ProductoOperacion,
+    onSolicitarEliminar: ((ProductoUi) -> Unit)?
 ) {
     if (productos.isEmpty()) {
         Surface(
@@ -210,11 +226,16 @@ private fun ListaProductos(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         productos.forEach { producto ->
+            val productoVisible = producto.producto.copy(
+                nombre = producto.nombre,
+                categoria = producto.categoria
+            )
             ProductCard(
                 producto = producto,
-                onEditar = onEditarProducto?.let { { it(producto.producto) } },
-                onCompartir = onCompartirProducto?.let { { it(producto.producto) } },
-                onEliminar = { onSolicitarEliminar(producto) }
+                onEditar = onEditarProducto?.let { { it(productoVisible) } },
+                onCompartir = onCompartirProducto?.let { { it(productoVisible) } },
+                eliminando = operacion.eliminando(producto.id),
+                onEliminar = onSolicitarEliminar?.let { { it(producto) } }
             )
         }
     }
@@ -225,29 +246,75 @@ fun ProductCard(
     producto: ProductoUi,
     onEditar: (() -> Unit)?,
     onCompartir: (() -> Unit)?,
-    onEliminar: (() -> Unit)?
+    onEliminar: (() -> Unit)?,
+    eliminando: Boolean = false
 ) {
-    ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
-    ) {
+    // Una fila pendiente que alcanzó el límite no debe confundirse con una
+    // pendiente normal: el usuario necesita localizarla para corregirla.
+    val requiereRevision = producto.origen == OrigenProducto.LOCAL &&
+        producto.id < 0 && producto.producto.intentos >= 5
+
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            Surface(
+                shape = RoundedCornerShape(50),
+                color = if (producto.activo) MaterialTheme.colorScheme.primaryContainer
+                else MaterialTheme.colorScheme.surfaceVariant
+            ) {
+                Text(
+                    text = if (producto.activo) "ACTIVO" else "INACTIVO",
+                    modifier = Modifier.padding(horizontal = 11.dp, vertical = 5.dp),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (producto.activo) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            if (requiereRevision) {
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = MaterialTheme.colorScheme.errorContainer
+                ) {
+                    Text(
+                        text = "REQUIERE REVISIÓN · 5 intentos",
+                        modifier = Modifier.padding(horizontal = 11.dp, vertical = 5.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                }
+                producto.producto.ultimoError?.takeIf(String::isNotBlank)?.let { error ->
+                    Text(
+                        text = "Último error: $error",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            } else if (producto.origen == OrigenProducto.LOCAL && producto.id < 0) {
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = MaterialTheme.colorScheme.tertiaryContainer
+                ) {
+                    Text(
+                        text = "PENDIENTE DE SINCRONIZAR",
+                        modifier = Modifier.padding(horizontal = 11.dp, vertical = 5.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                    )
+                }
+            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primaryContainer
-                ) {
-                    Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                Surface(shape = RoundedCornerShape(12.dp), color = AzulNoche) {
+                    Box(modifier = Modifier.size(54.dp), contentAlignment = Alignment.Center) {
                         Text(
                             text = producto.nombre.take(1).uppercase(),
                             style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                            color = AzulClaro
                         )
                     }
                 }
@@ -259,7 +326,7 @@ fun ProductCard(
                         fontWeight = FontWeight.SemiBold
                     )
 
-                    Text("Código #${producto.id}", style = MaterialTheme.typography.bodySmall,
+                    Text("Código #${producto.id.toString().padStart(4, '0')}", style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (producto.origen == OrigenProducto.REMOTO) {
                         Text(
@@ -270,33 +337,53 @@ fun ProductCard(
                     }
                 }
 
-                Row {
+                Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                     if (onEditar != null) {
-                        IconButton(onClick = onEditar) {
+                        FilledTonalIconButton(
+                            onClick = onEditar,
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        ) {
                             Icon(
-                                imageVector = Icons.Default.Edit,
+                                imageVector = Icons.Default.EditNote,
                                 contentDescription = "Editar ${producto.nombre}"
                             )
                         }
                     }
                     if (onEliminar != null) {
-                        IconButton(onClick = onEliminar) {
+                        FilledTonalIconButton(
+                            onClick = onEliminar,
+                            enabled = !eliminando,
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer,
+                                contentColor = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        ) {
                             Icon(
-                                imageVector = Icons.Default.Delete,
-                                contentDescription = "Eliminar ${producto.nombre}",
-                                tint = MaterialTheme.colorScheme.error
+                                imageVector = Icons.Default.DeleteForever,
+                                contentDescription = "Eliminar ${producto.nombre}"
                             )
                         }
                     }
                 }
             }
 
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow
+            ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Column(
+                    modifier = Modifier.padding(start = 14.dp, top = 12.dp, bottom = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
                     Text(
                         text = producto.precio,
                         style = MaterialTheme.typography.titleLarge,
@@ -306,8 +393,10 @@ fun ProductCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    EstadoProductoBadge(activo = producto.activo)
+                Row(
+                    modifier = Modifier.padding(end = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     StockBadge(
                         stock = producto.stock,
                         stockDisponible = producto.stockDisponible,
@@ -315,11 +404,13 @@ fun ProductCard(
                     )
                 }
             }
+            }
 
             if (onCompartir != null) {
                 OutlinedButton(
                     onClick = onCompartir,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Share,
