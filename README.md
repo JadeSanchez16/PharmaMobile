@@ -380,7 +380,9 @@ ejecutada.
 Se conserva el recorrido existente: autenticación JWT, roles, CRUD, SQLDelight,
 sincronización offline-first, reintentos, permisos nativos y telemetría Firebase.
 La sesión 14 se limita a estabilizar ese recorrido, firmar, empaquetar y probar.
-No incorpora migraciones, rediseños ni cambios de arquitectura o dependencias.
+No incorpora migraciones, rediseños ni cambios de arquitectura o dependencias
+funcionales. Se fija R8 9.1.31, compatible con Kotlin 2.4, para corregir el aviso
+real de lectura de metadatos durante la primera minificación release.
 
 El texto de acceso ya no afirma que la base está vacía: el logout elimina la
 sesión, pero conserva el catálogo local. La recepción de notificaciones nativas
@@ -413,6 +415,10 @@ Salidas: `androidApp/build/outputs/bundle/release/androidApp-release.aab` y
 `apksigner verify --verbose --print-certs` de las Android SDK Build Tools.
 La minificación release queda habilitada y debe verificarse con el APK real;
 una compilación exitosa no acredita por sí sola serialización, Koin ni el CRUD.
+`settings.gradle.kts` sustituye únicamente R8 mediante el mecanismo oficial de
+`pluginManagement.buildscript`; se conserva AGP 9.0.1. Referencias:
+[compatibilidad Kotlin/R8](https://developer.android.com/build/kotlin-support) y
+[sustitución de R8 en AGP](https://r8.googlesource.com/r8/+/refs/heads/main/README.md#replacing-r8-in-android-gradle-plugin).
 
 ### Acceso desde teléfonos físicos
 
