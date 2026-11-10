@@ -1,6 +1,7 @@
 package pe.edu.upeu.pharmamobilee.di
 
 import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
 import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.engine.okhttp.OkHttp
 import org.koin.android.ext.koin.androidContext
@@ -18,7 +19,11 @@ import pe.edu.upeu.pharmamobilee.permiso.GestorPermisosAndroid
 
 actual val platformModule: Module = module {
     single<HttpClientEngine> { OkHttp.create() }
-    single(named("urlBase")) { "http://10.0.2.2:8080/api/v1/" }
+    single(named("urlBase")) {
+        val contexto = androidContext()
+        contexto.packageManager.getApplicationInfo(contexto.packageName, PackageManager.GET_META_DATA)
+            .metaData?.getString("pharmamobile.apiBaseUrl") ?: "http://10.0.2.2:8080/api/v1/"
+    }
     single(named("esDepuracion")) {
         androidContext().applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
     }

@@ -19,3 +19,8 @@ captures
 node_modules/
 # Configuración local de Firebase: se mantiene fuera del repositorio.
 androidApp/google-services.json
+
+# Firma release privada
+keystore.properties
+*.jks
+*.keystore

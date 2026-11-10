@@ -374,3 +374,62 @@ guardados y la etiqueta pendiente. Al restaurar la conexión y pulsar
 Swagger/Postman. La ejecución y capturas iOS requieren macOS con Xcode; en
 Windows el driver iOS se conserva en el código, pero no se declara como prueba
 ejecutada.
+
+## Estabilización y alcance congelado S14
+
+Se conserva el recorrido existente: autenticación JWT, roles, CRUD, SQLDelight,
+sincronización offline-first, reintentos, permisos nativos y telemetría Firebase.
+La sesión 14 se limita a estabilizar ese recorrido, firmar, empaquetar y probar.
+No incorpora migraciones, rediseños ni cambios de arquitectura o dependencias.
+
+El texto de acceso ya no afirma que la base está vacía: el logout elimina la
+sesión, pero conserva el catálogo local. La recepción de notificaciones nativas
+y la ejecución iOS se mantienen como limitaciones declaradas; el permiso de
+notificaciones y el puerto de telemetría siguen disponibles.
+
+## Firma y builds de entrega S14
+
+El applicationId se conserva como `pe.edu.upeu.pharmamobilee`, asociado a Firebase.
+Versión: `versionCode=1`, `versionName=1.0.0`. La clave de entrega debe ser distinta
+de la debug y conservarse fuera del repositorio junto con una copia protegida en
+otra unidad. Perder la clave impide actualizar instalaciones firmadas con ella.
+
+Crear localmente `keystore.properties` en la raíz con las propiedades
+`storeFile`, `storePassword`, `keyAlias` y `keyPassword`. El archivo y los almacenes
+`*.jks`/`*.keystore` están ignorados por Git. No publicar valores de contraseñas ni
+copiar el almacén en incidencias, capturas o informes. `storeFile` admite una ruta
+absoluta externa; en Windows usar `/` en la ruta.
+
+Debug no necesita ese archivo. Release valida su existencia y las cuatro
+propiedades antes de compilar; nunca usa la clave debug como sustituto.
+
+```powershell
+.\gradlew.bat :androidApp:assembleDebug :shared:testAndroidHostTest
+.\gradlew.bat :androidApp:bundleRelease :androidApp:assembleRelease
+```
+
+Salidas: `androidApp/build/outputs/bundle/release/androidApp-release.aab` y
+`androidApp/build/outputs/apk/release/androidApp-release.apk`. Comprobar el APK con
+`apksigner verify --verbose --print-certs` de las Android SDK Build Tools.
+La minificación release queda habilitada y debe verificarse con el APK real;
+una compilación exitosa no acredita por sí sola serialización, Koin ni el CRUD.
+
+### Acceso desde teléfonos físicos
+
+`10.0.2.2` se usa exclusivamente en el emulador. Para un teléfono en la misma
+red local, proporcionar la URL de PharmaSoft al generar el build:
+
+```powershell
+.\gradlew.bat :androidApp:bundleRelease :androidApp:assembleRelease "-PpharmaApiUrl=http://DIRECCION_LAN_DEL_SERVIDOR:8080/api/v1/"
+```
+
+Sustituir el marcador por la dirección real comprobada. La URL queda en los
+metadatos de la app y la configuración de seguridad permite HTTP sólo para ese
+host, no globalmente. No incluir usuario, contraseña ni JWT en la URL.
+En una prueba USB puede utilizarse `adb reverse tcp:8080 tcp:8080` con un build
+configurado para `http://localhost:8080/api/v1/`, pero esto no acredita la prueba
+independiente del cable: para ella se necesita la dirección LAN accesible.
+
+La guía requiere ocho escenarios en cada uno de dos teléfonos físicos distintos.
+Las ejecuciones del emulador son comprobaciones complementarias y no sustituyen
+esa matriz. El archive/IPA requiere macOS, Xcode y la firma Apple correspondiente.
