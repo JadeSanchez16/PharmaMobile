@@ -81,8 +81,7 @@ fun LoginScreen(
                 )
             }
 
-            // Tras borrar los datos locales no hay catálogo ni sesión que restaurar.
-            // Es un estado inicial informado, no un error de conexión ni de autenticación.
+            // Sin sesión no se expone el catálogo, aunque existan filas guardadas.
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
@@ -96,12 +95,12 @@ fun LoginScreen(
                     Icon(Icons.Default.Inventory2, contentDescription = null)
                     Column {
                         Text(
-                            text = "Catálogo sin datos locales",
+                            text = "Accede a tu catálogo",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold
                         )
                         Text(
-                            text = "Conéctate e inicia sesión para sincronizar el catálogo por primera vez.",
+                            text = "Inicia sesión para consultar el catálogo guardado y sincronizarlo cuando tengas conexión.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSecondaryContainer
                         )
